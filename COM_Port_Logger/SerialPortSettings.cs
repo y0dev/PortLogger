@@ -3,6 +3,13 @@ using System.IO.Ports;
 
 namespace COM_Port_Logger
 {
+	public static class TimeConstants
+	{
+		public const int Seconds = 1000;     // 1 second in milliseconds
+		public const int Minutes = 60000;    // 1 minute in milliseconds
+		public const int Hours = 3600000;    // 1 hour in milliseconds
+	}
+
 	public static class SerialPortSettings
 	{
 		public static string SetPortName(string defaultPortName)

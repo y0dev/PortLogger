@@ -3,45 +3,54 @@ using System.IO;
 using System.IO.Ports;
 using System.Threading;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace COM_Port_Logger
 {
 	public class PortLog
 	{
-		static bool _continue;
-		static SerialPort _serialPort;
-		static StreamWriter _logFile;
-		static Thread readThread;
-		static Thread logThread;
-		static string _logMessage;
-		static readonly object _lockObject = new object();
+		static bool _continue; // Flag to control the continuation of threads
+		static SerialPort _serialPort; // SerialPort object
+		static StreamWriter _logFile; // StreamWriter for log file
+		static string _logMessage; // Message to be logged
+		static readonly object _lockObject = new object(); // Object for thread synchronization
+		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
 
 		public static void Start()
 		{
 			try
 			{
+				// Load configuration settings
+				ConfigSettings config = LoadConfig();
+
 				// Initialize and configure the SerialPort
 				_serialPort = new SerialPort();
-				_serialPort.PortName = SerialPortSettings.SetPortName(_serialPort.PortName);
-				_serialPort.BaudRate = SerialPortSettings.SetPortBaudRate(_serialPort.BaudRate);
-				_serialPort.Parity = SerialPortSettings.SetPortParity(_serialPort.Parity);
-				_serialPort.DataBits = SerialPortSettings.SetPortDataBits(_serialPort.DataBits);
-				_serialPort.StopBits = SerialPortSettings.SetPortStopBits(_serialPort.StopBits);
-				_serialPort.Handshake = SerialPortSettings.SetPortHandshake(_serialPort.Handshake);
+				_serialPort.PortName = InputValidator.ValidatePortName(config.SerialPort.PortName);
+				_serialPort.BaudRate = InputValidator.ValidateBaudRate(config.SerialPort.BaudRate);
+				_serialPort.Parity = InputValidator.ValidateParity(config.SerialPort.Parity);
+				_serialPort.DataBits = InputValidator.ValidateDataBits(config.SerialPort.DataBits);
+				_serialPort.StopBits = InputValidator.ValidateStopBits(config.SerialPort.StopBits);
+				_serialPort.Handshake = InputValidator.ValidateHandshake(config.SerialPort.Handshake);
 				_serialPort.ReadTimeout = 500;
 				_serialPort.WriteTimeout = 500;
 
 				// Open the serial port and log file with shared read access
 				_serialPort.Open();
-				_logFile = FileHandler.CreateLogFile("log");
+				// Open the log file
+				string logDirectory = InputValidator.ValidateLogDirectory(config.LogFile.Directory);
+				string logFileName = InputValidator.ValidateLogFileName(config.LogFile.FileName);
+				string logFilePath = Path.Combine(logDirectory, logFileName);
+				_logFile = FileHandler.CreateLogFile(logFilePath);
 
 				_continue = true; // Set continuation flag to true
 
-				// Start the read and log threads
-				readThread = new Thread(ReadSerialPort);
-				logThread = new Thread(WriteToLog);
-				readThread.Start();
-				logThread.Start();
+				// Start background threads for reading from serial port and writing to log file
+				Task.Run(() => ReadSerialPort());
+				Task.Run(() => WriteToLog());
+				Task.Run(() => CheckConnection()); // Start background task to check connection
+
+				// Define timeout duration (in milliseconds)
+				int timeoutMilliseconds = 5 * TimeConstants.Minutes; // 5 minutes
 
 				Console.WriteLine("Type QUIT to exit");
 
@@ -49,7 +58,26 @@ namespace COM_Port_Logger
 				while (_continue)
 				{
 					string message = Console.ReadLine();
-					if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
+					if (string.IsNullOrEmpty(message))
+					{
+						// Start timeout countdown if there is no user input
+						DateTime startTime = DateTime.Now;
+						while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMilliseconds)
+						{
+							if (!string.IsNullOrEmpty(Console.ReadLine()))
+							{
+								// Reset timeout countdown if user input is detected
+								startTime = DateTime.Now;
+							}
+							else
+							{
+								// Exit the program if timeout expires
+								_continue = false;
+								break;
+							}
+						}
+					}
+					else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
 					{
 						_continue = false; // Exit the loop if "QUIT" is entered
 					}
@@ -59,11 +87,11 @@ namespace COM_Port_Logger
 					}
 				}
 
-				// Wait for threads to complete and close resources
-				readThread.Join();
-				logThread.Join();
 				_serialPort.Close();
 				_logFile.Close();
+
+				// Set log file as read-only
+				File.SetAttributes(logFilePath, File.GetAttributes(logFilePath) | FileAttributes.ReadOnly);
 			}
 			catch (Exception ex)
 			{
@@ -78,7 +106,7 @@ namespace COM_Port_Logger
 				// Read configuration from config.json file
 				string configFile = File.ReadAllText("config.json");
 				// Deserialize JSON into ConfigSettings object
-				return new ConfigSettings();  // JsonSerializer.Deserialize<ConfigSettings>(configFile);
+				return JsonSerializer.Deserialize<ConfigSettings>(configFile);
 			}
 			catch (FileNotFoundException)
 			{
@@ -155,5 +183,52 @@ namespace COM_Port_Logger
 				}
 			}
 		} // End of WriteToLog()
+
+		private static void OpenSerialPort()
+		{
+			try
+			{
+				if (!_serialPort.IsOpen)
+				{
+					_serialPort.Open();
+				}
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error opening serial port: {ex.Message}");
+				TryReconnect();
+			}
+		} // End of OpenSerialPort()
+
+		private static void TryReconnect()
+		{
+			if (!_reconnecting)
+			{
+				_reconnecting = true;
+				Console.WriteLine("Attempting to reconnect...");
+				Task.Run(async () =>
+				{
+					while (!_serialPort.IsOpen)
+					{
+						OpenSerialPort();
+						await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect again
+					}
+					Console.WriteLine("Reconnection successful.");
+					_reconnecting = false;
+				});
+			}
+		} // End of TryReconnect()
+
+		private static void CheckConnection()
+		{
+			while (_continue)
+			{
+				if (!_serialPort.IsOpen)
+				{
+					TryReconnect();
+				}
+				Thread.Sleep(1000); // Check connection status every 1 second
+			}
+		} // End of CheckConnection()
 	} // End of PortLog class
 } // End of COM_Port_Logger namespace

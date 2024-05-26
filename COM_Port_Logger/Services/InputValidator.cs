@@ -2,7 +2,7 @@
 using System.IO.Ports;
 using System.Linq;
 
-namespace COM_Port_Logger
+namespace COM_Port_Logger.Services
 {
 	public static class InputValidator
 	{
@@ -11,6 +11,10 @@ namespace COM_Port_Logger
 			// Validate port name input
 			if (!SerialPort.GetPortNames().Contains(portName))
 			{
+				foreach(string port in SerialPort.GetPortNames())
+				{
+					Console.WriteLine(port);
+				}
 				Console.WriteLine($"Invalid port name '{portName}'. Using default port COM1.");
 				return "COM1"; // Use default port if input is invalid
 			}

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO.Ports;
 
-namespace COM_Port_Logger
+namespace COM_Port_Logger.ConfigurationSettings
 {
 	public static class TimeConstants
 	{

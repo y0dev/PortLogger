@@ -4,12 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace COM_Port_Logger
+namespace COM_Port_Logger.ConfigurationSettings
 {
 	public class ConfigSettings
 	{
 		public SerialPortConfig SerialPort { get; set; } = new SerialPortConfig();
 		public LogFileSettings LogFile { get; set; } = new LogFileSettings();
+		public DisplaySettings Display { get; set; } = new DisplaySettings(); // Added display settings
 	}
 
 	public class SerialPortConfig
@@ -24,7 +25,15 @@ namespace COM_Port_Logger
 
 	public class LogFileSettings
 	{
-		public string Directory { get; set; } = "logs";
+		public string BaseDirectory { get; set; } = "logs";
 		public string FileName { get; set; } = "log.txt";
+	}
+
+	public class DisplaySettings
+	{
+		public string BackgroundColor { get; set; } = "Black";
+		public string TextColor { get; set; } = "White";
+		public string NumberColor { get; set; } = "Yellow";
+		public string ConsoleName { get; set; }
 	}
 }

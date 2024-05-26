@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace COM_Port_Logger
+namespace COM_Port_Logger.Services
 {
 	public static class FileHandler
 	{

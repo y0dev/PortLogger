@@ -3,7 +3,10 @@ using System.IO;
 using System.IO.Ports;
 using System.Threading;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using COM_Port_Logger.Services;
+using COM_Port_Logger.ConfigurationSettings;
 
 namespace COM_Port_Logger
 {
@@ -15,30 +18,34 @@ namespace COM_Port_Logger
 		static string _logMessage; // Message to be logged
 		static readonly object _lockObject = new object(); // Object for thread synchronization
 		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
+		static ConfigSettings _config; // Configuration settings
 
 		public static void Start()
 		{
 			try
 			{
 				// Load configuration settings
-				ConfigSettings config = LoadConfig();
+				_config = LoadConfig();
+
+				// Apply display settings
+				ApplyDisplaySettings();
 
 				// Initialize and configure the SerialPort
 				_serialPort = new SerialPort();
-				_serialPort.PortName = InputValidator.ValidatePortName(config.SerialPort.PortName);
-				_serialPort.BaudRate = InputValidator.ValidateBaudRate(config.SerialPort.BaudRate);
-				_serialPort.Parity = InputValidator.ValidateParity(config.SerialPort.Parity);
-				_serialPort.DataBits = InputValidator.ValidateDataBits(config.SerialPort.DataBits);
-				_serialPort.StopBits = InputValidator.ValidateStopBits(config.SerialPort.StopBits);
-				_serialPort.Handshake = InputValidator.ValidateHandshake(config.SerialPort.Handshake);
+				_serialPort.PortName = InputValidator.ValidatePortName(_config.SerialPort.PortName);
+				_serialPort.BaudRate = InputValidator.ValidateBaudRate(_config.SerialPort.BaudRate);
+				_serialPort.Parity = InputValidator.ValidateParity(_config.SerialPort.Parity);
+				_serialPort.DataBits = InputValidator.ValidateDataBits(_config.SerialPort.DataBits);
+				_serialPort.StopBits = InputValidator.ValidateStopBits(_config.SerialPort.StopBits);
+				_serialPort.Handshake = InputValidator.ValidateHandshake(_config.SerialPort.Handshake);
 				_serialPort.ReadTimeout = 500;
 				_serialPort.WriteTimeout = 500;
 
 				// Open the serial port and log file with shared read access
 				_serialPort.Open();
 				// Open the log file
-				string logDirectory = InputValidator.ValidateLogDirectory(config.LogFile.Directory);
-				string logFileName = InputValidator.ValidateLogFileName(config.LogFile.FileName);
+				string logDirectory = InputValidator.ValidateLogDirectory(_config.LogFile.BaseDirectory);
+				string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
 				string logFilePath = Path.Combine(logDirectory, logFileName);
 				_logFile = FileHandler.CreateLogFile(logFilePath);
 
@@ -122,6 +129,42 @@ namespace COM_Port_Logger
 			}
 		} // End of LoadConfig()
 
+		private static void ApplyDisplaySettings()
+		{
+			try
+			{
+				Console.BackgroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.BackgroundColor, true);
+				Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+				Console.Title = _config.Display.ConsoleName;
+				Console.Clear();
+			}
+			catch (ArgumentException ex)
+			{
+				Console.WriteLine($"Error applying display settings: {ex.Message}");
+				Console.ResetColor();
+			}
+		} // End of ApplyDisplaySettings()
+
+		private static void DisplayMessage(string message)
+		{
+			var numberRegex = new Regex(@"\d+");
+			var parts = numberRegex.Split(message);
+			var matches = numberRegex.Matches(message);
+
+			Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+			for (int i = 0; i < parts.Length; i++)
+			{
+				Console.Write(parts[i]);
+				if (i < matches.Count)
+				{
+					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.NumberColor, true);
+					Console.Write(matches[i].Value);
+					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+				}
+			}
+			Console.WriteLine();
+		}
+
 		private static void ReadSerialPort()
 		{
 			// Continuously read from the serial port
@@ -130,7 +173,7 @@ namespace COM_Port_Logger
 				try
 				{
 					string message = _serialPort.ReadLine(); // Read a line from the serial port
-					Console.WriteLine(message); // Display the message
+					DisplayMessage(message); // Display the message with color handling
 					lock (_lockObject)
 					{
 						_logMessage = message; // Set the log message

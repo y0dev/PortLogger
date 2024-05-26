@@ -2,7 +2,6 @@
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using COM_Port_Logger.Services;
@@ -108,26 +107,109 @@ namespace COM_Port_Logger
 
 		private static ConfigSettings LoadConfig()
 		{
+			var config = new ConfigSettings();
 			try
 			{
-				// Read configuration from config.json file
-				string configFile = File.ReadAllText("config.json");
-				// Deserialize JSON into ConfigSettings object
-				return JsonSerializer.Deserialize<ConfigSettings>(configFile);
+				var lines = File.ReadAllLines("config.txt");
+				string currentSection = string.Empty;
+
+				foreach (var line in lines)
+				{
+					var trimmedLine = line.Trim();
+					if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith(";"))
+						continue;
+
+					if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
+					{
+						currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
+					}
+					else
+					{
+						var keyValue = trimmedLine.Split('=');
+						if (keyValue.Length == 2)
+						{
+							var key = keyValue[0].Trim();
+							var value = keyValue[1].Trim();
+
+							switch (currentSection)
+							{
+								case "SerialPort":
+									SetSerialPortSetting(config.SerialPort, key, value);
+									break;
+								case "LogFile":
+									SetLogFileSetting(config.LogFile, key, value);
+									break;
+								case "Display":
+									SetDisplaySetting(config.Display, key, value);
+									break;
+							}
+						}
+					}
+				}
 			}
 			catch (FileNotFoundException)
 			{
 				Console.WriteLine("Config file not found. Using default settings.");
-				// If config file is not found, return default settings
-				return new ConfigSettings();
 			}
 			catch (Exception ex)
 			{
 				Console.WriteLine($"Error loading config file: {ex.Message}");
-				// If any other error occurs, return default settings
-				return new ConfigSettings();
 			}
+
+			return config;
 		} // End of LoadConfig()
+
+		private static void SetSerialPortSetting(SerialPortConfig settings, string key, string value)
+		{
+			switch (key)
+			{
+				case "PortName":
+					settings.PortName = value;
+					break;
+				case "BaudRate":
+					settings.BaudRate = int.Parse(value);
+					break;
+				case "Parity":
+					settings.Parity = value;
+					break;
+				case "DataBits":
+					settings.DataBits = int.Parse(value);
+					break;
+				case "StopBits":
+					settings.StopBits = value;
+					break;
+				case "Handshake":
+					settings.Handshake = value;
+					break;
+			}
+		} // End of SetSerialPortSetting()
+
+		private static void SetLogFileSetting(LogFileSettings settings, string key, string value)
+		{
+			if (key == "BaseDirectory")
+			{
+				settings.BaseDirectory = value;
+			}
+		} // End of SetLogFileSetting()
+
+		private static void SetDisplaySetting(DisplaySettings settings, string key, string value)
+		{
+			switch (key)
+			{
+				case "BackgroundColor":
+					settings.BackgroundColor = value;
+					break;
+				case "TextColor":
+					settings.TextColor = value;
+					break;
+				case "NumberColor":
+					settings.NumberColor = value;
+					break;
+				case "ConsoleName":
+					settings.ConsoleName = value;
+					break;
+			}
+		} // End of SetDisplaySetting()
 
 		private static void ApplyDisplaySettings()
 		{

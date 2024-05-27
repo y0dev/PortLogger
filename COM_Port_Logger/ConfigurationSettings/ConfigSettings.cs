@@ -31,9 +31,7 @@ namespace COM_Port_Logger.ConfigurationSettings
 
 	public class DisplaySettings
 	{
-		public string BackgroundColor { get; set; } = "Black";
-		public string TextColor { get; set; } = "White";
-		public string NumberColor { get; set; } = "Yellow";
+		public string ColorScheme { get; set; } = "DarkMode";
 		public string ConsoleName { get; set; }
 	}
 }

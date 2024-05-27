@@ -73,6 +73,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ConfigurationSettings\ColorScheme.cs" />
     <Compile Include="ConfigurationSettings\ConfigSettings.cs" />
     <Compile Include="Services\FileHandler.cs" />
     <Compile Include="Services\InputValidator.cs" />

@@ -18,6 +18,8 @@ namespace COM_Port_Logger
 		static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1); // Semaphore for async synchronization
 		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
 		static ConfigSettings _config; // Configuration settings
+		static ColorScheme _colorScheme; // Color scheme for console
+
 
 		public static void Start(string consoleName)
 		{
@@ -31,6 +33,8 @@ namespace COM_Port_Logger
 					Console.WriteLine($"No configuration found for console name: {consoleName}");
 					return;
 				}
+
+				_colorScheme = ColorScheme.GetColorScheme(_config.Display.ColorScheme);
 
 				ConsoleColor bgColor = Console.BackgroundColor;
 				ConsoleColor fgColor = Console.ForegroundColor;
@@ -238,14 +242,8 @@ namespace COM_Port_Logger
 		{
 			switch (key)
 			{
-				case "BackgroundColor":
-					settings.BackgroundColor = value;
-					break;
-				case "TextColor":
-					settings.TextColor = value;
-					break;
-				case "NumberColor":
-					settings.NumberColor = value;
+				case "ColorScheme":
+					settings.ColorScheme = value;
 					break;
 				case "ConsoleName":
 					settings.ConsoleName = value;
@@ -257,8 +255,9 @@ namespace COM_Port_Logger
 		{
 			try
 			{
-				Console.BackgroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.BackgroundColor, true);
-				Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+				
+				Console.BackgroundColor = _colorScheme.BackgroundColor;
+				Console.ForegroundColor = _colorScheme.TextColor;
 				Console.Title = _config.Display.ConsoleName;
 				Console.Clear();
 			}
@@ -275,15 +274,15 @@ namespace COM_Port_Logger
 			var parts = numberRegex.Split(message);
 			var matches = numberRegex.Matches(message);
 
-			Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+			Console.ForegroundColor = _colorScheme.TextColor;
 			for (int i = 0; i < parts.Length; i++)
 			{
 				Console.Write(parts[i]);
 				if (i < matches.Count)
 				{
-					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.NumberColor, true);
+					Console.ForegroundColor = _colorScheme.NumberColor;
 					Console.Write(matches[i].Value);
-					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+					Console.ForegroundColor = _colorScheme.TextColor;
 				}
 			}
 			Console.WriteLine();

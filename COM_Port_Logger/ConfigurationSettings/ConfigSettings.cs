@@ -16,7 +16,7 @@ namespace COM_Port_Logger.ConfigurationSettings
 	public class SerialPortConfig
 	{
 		public string PortName { get; set; } = "COM1";
-		public int BaudRate { get; set; } = 9600;
+		public int BaudRate { get; set; } = 115200;
 		public string Parity { get; set; } = "None";
 		public int DataBits { get; set; } = 8;
 		public string StopBits { get; set; } = "One";

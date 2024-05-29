@@ -1,0 +1,49 @@
+﻿<Window x:Class="ConnectionIndicatorApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Connection Indicator App" Height="450" Width="800">
+	<Grid>
+		<DockPanel LastChildFill="True">
+			<!-- Settings Button -->
+			<Button Content="Settings" Click="Settings_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"/>
+
+			<!-- Log Level Dropdown -->
+			<ComboBox Name="logLevelComboBox" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
+				<ComboBoxItem Content="INFO"/>
+				<ComboBoxItem Content="DEBUG"/>
+				<!-- Add more log levels as needed -->
+			</ComboBox>
+
+			<!-- Status Indicator -->
+			<Canvas Name="statusCanvas" Width="135" Height="35" DockPanel.Dock="Top" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,10,10">
+				<Ellipse Width="15" Height="15" Fill="Red" Canvas.Top="10" Canvas.Right="10" />
+				<TextBlock  Height="13" Text="Not Connected" HorizontalAlignment="Left" VerticalAlignment="Center" Canvas.Left="10" Canvas.Top="10" Width="101" />
+			</Canvas>
+
+			<!-- Log Output TextBox -->
+			<TextBox Name="logTextBox" VerticalScrollBarVisibility="Auto" 
+                     HorizontalScrollBarVisibility="Auto" 
+                     IsReadOnly="True" 
+                     DockPanel.Dock="Top" 
+                     Margin="5" Height="315" />
+
+			
+			<!-- Start and Stop Buttons -->
+			<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+				<Button Name="btnStart" Content="Start" Click="btnStart_Click" Width="75" Margin="5"/>
+				<Button Name="btnStop" Content="Stop" Click="btnStop_Click" Width="75" Margin="5" IsEnabled="False"/>
+				<!-- Save Log Button -->
+				<Button Name="btnSaveLog" Content="Save Log" Click="btnSaveLog_Click" Width="75" Margin="5" IsEnabled="False"/>
+
+			</StackPanel>
+			
+
+			<!-- Connected Clients TextBox -->
+			<TextBox Name="connectedClientsTextBox" VerticalScrollBarVisibility="Auto" 
+                     HorizontalScrollBarVisibility="Auto" 
+                     IsReadOnly="True" 
+                     DockPanel.Dock="Bottom" 
+                     Margin="5" Height="22" />
+		</DockPanel>
+	</Grid>
+</Window>

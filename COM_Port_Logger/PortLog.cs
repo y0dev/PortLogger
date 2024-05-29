@@ -2,7 +2,6 @@
 using System.IO;
 using System.IO.Ports;
 using System.Threading;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using COM_Port_Logger.Services;
@@ -16,16 +15,30 @@ namespace COM_Port_Logger
 		static SerialPort _serialPort; // SerialPort object
 		static StreamWriter _logFile; // StreamWriter for log file
 		static string _logMessage; // Message to be logged
-		static readonly object _lockObject = new object(); // Object for thread synchronization
+		static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1); // Semaphore for async synchronization
 		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
 		static ConfigSettings _config; // Configuration settings
+		static ColorScheme _colorScheme; // Color scheme for console
 
-		public static void Start()
+
+		public static void Start(string consoleName)
 		{
 			try
 			{
-				// Load configuration settings
-				_config = LoadConfig();
+				// Load configuration settings for the specified console name
+				_config = LoadConfig(consoleName);
+
+				if (_config == null)
+				{
+					Console.WriteLine($"No configuration found for console name: {consoleName}");
+					return;
+				}
+
+				_colorScheme = ColorScheme.GetColorScheme(_config.Display.ColorScheme);
+
+				ConsoleColor bgColor = Console.BackgroundColor;
+				ConsoleColor fgColor = Console.ForegroundColor;
+				string title = Console.Title;
 
 				// Apply display settings
 				ApplyDisplaySettings();
@@ -51,10 +64,10 @@ namespace COM_Port_Logger
 
 				_continue = true; // Set continuation flag to true
 
-				// Start background threads for reading from serial port and writing to log file
-				Task.Run(() => ReadSerialPort());
-				Task.Run(() => WriteToLog());
-				Task.Run(() => CheckConnection()); // Start background task to check connection
+				// Start background tasks for reading from serial port and writing to log file
+				_ = Task.Run(ReadSerialPortAsync);
+				_ = Task.Run(WriteToLogAsync);
+				_ = Task.Run(CheckConnectionAsync);
 
 				// Define timeout duration (in milliseconds)
 				int timeoutMilliseconds = 5 * TimeConstants.Minutes; // 5 minutes
@@ -96,6 +109,7 @@ namespace COM_Port_Logger
 
 				_serialPort.Close();
 				_logFile.Close();
+				Console.ResetColor();
 
 				// Set log file as read-only
 				File.SetAttributes(logFilePath, File.GetAttributes(logFilePath) | FileAttributes.ReadOnly);
@@ -103,38 +117,147 @@ namespace COM_Port_Logger
 			catch (Exception ex)
 			{
 				Console.WriteLine($"An error occurred: {ex.Message}");
+				Console.ResetColor();
 			}
 		} // End of Start()
 
-		private static ConfigSettings LoadConfig()
+		private static ConfigSettings LoadConfig(string consoleName)
+		{
+			var configDirectory = "configs"; // Directory containing the configuration files
+			var configFiles = FileHandler.SearchConfigFiles(configDirectory);
+
+			foreach (var configFilePath in configFiles)
+			{
+				var config = new ConfigSettings();
+				Console.WriteLine($"Configuration path: {configFilePath}");
+				try
+				{
+					var lines = File.ReadAllLines(configFilePath);
+					string currentSection = string.Empty;
+
+					foreach (var line in lines)
+					{
+						var trimmedLine = line.Trim();
+						if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith(";"))
+							continue;
+
+						if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
+						{
+							currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
+						}
+						else
+						{
+							var keyValue = trimmedLine.Split('=');
+							if (keyValue.Length == 2)
+							{
+								var key = keyValue[0].Trim();
+								var value = keyValue[1].Trim();
+
+								switch (currentSection)
+								{
+									case "SerialPort":
+										SetSerialPortSetting(config.SerialPort, key, value);
+										break;
+									case "LogFile":
+										SetLogFileSetting(config.LogFile, key, value);
+										break;
+									case "Display":
+										SetDisplaySetting(config.Display, key, value);
+										break;
+								}
+							}
+						}
+					}
+					
+					if (config.Display.ConsoleName.Equals(consoleName, StringComparison.OrdinalIgnoreCase))
+					{
+						if (ValidateCOMPort(config.SerialPort.PortName))
+						{
+							return config;
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Error loading config file: {ex.Message}");
+				}
+			}
+
+			return null;
+			
+		} // End of LoadConfig()
+
+		private static bool ValidateCOMPort(string portName)
 		{
 			try
 			{
-				// Read configuration from config.json file
-				string configFile = File.ReadAllText("config.json");
-				// Deserialize JSON into ConfigSettings object
-				return JsonSerializer.Deserialize<ConfigSettings>(configFile);
+
+				Console.WriteLine($"Checking if we can connect to port {portName}");
+				using (var tempSerialPort = new SerialPort(portName))
+				{
+					tempSerialPort.Open();
+					return true; // COM port can be opened
+				}
 			}
-			catch (FileNotFoundException)
+			catch
 			{
-				Console.WriteLine("Config file not found. Using default settings.");
-				// If config file is not found, return default settings
-				return new ConfigSettings();
+				return false; // COM port cannot be opened
 			}
-			catch (Exception ex)
+		} // End of ValidateCOMPort()
+
+		private static void SetSerialPortSetting(SerialPortConfig settings, string key, string value)
+		{
+			switch (key)
 			{
-				Console.WriteLine($"Error loading config file: {ex.Message}");
-				// If any other error occurs, return default settings
-				return new ConfigSettings();
+				case "PortName":
+					settings.PortName = value;
+					break;
+				case "BaudRate":
+					settings.BaudRate = int.Parse(value);
+					break;
+				case "Parity":
+					settings.Parity = value;
+					break;
+				case "DataBits":
+					settings.DataBits = int.Parse(value);
+					break;
+				case "StopBits":
+					settings.StopBits = value;
+					break;
+				case "Handshake":
+					settings.Handshake = value;
+					break;
 			}
-		} // End of LoadConfig()
+		} // End of SetSerialPortSetting()
+
+		private static void SetLogFileSetting(LogFileSettings settings, string key, string value)
+		{
+			if (key == "BaseDirectory")
+			{
+				settings.BaseDirectory = value;
+			}
+		} // End of SetLogFileSetting()
+
+		private static void SetDisplaySetting(DisplaySettings settings, string key, string value)
+		{
+			switch (key)
+			{
+				case "ColorScheme":
+					settings.ColorScheme = value;
+					break;
+				case "ConsoleName":
+					settings.ConsoleName = value;
+					break;
+			}
+		} // End of SetDisplaySetting()
 
 		private static void ApplyDisplaySettings()
 		{
 			try
 			{
-				Console.BackgroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.BackgroundColor, true);
-				Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+				
+				Console.BackgroundColor = _colorScheme.BackgroundColor;
+				Console.ForegroundColor = _colorScheme.TextColor;
 				Console.Title = _config.Display.ConsoleName;
 				Console.Clear();
 			}
@@ -151,127 +274,174 @@ namespace COM_Port_Logger
 			var parts = numberRegex.Split(message);
 			var matches = numberRegex.Matches(message);
 
-			Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+			Console.ForegroundColor = _colorScheme.TextColor;
 			for (int i = 0; i < parts.Length; i++)
 			{
 				Console.Write(parts[i]);
 				if (i < matches.Count)
 				{
-					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.NumberColor, true);
+					Console.ForegroundColor = _colorScheme.NumberColor;
 					Console.Write(matches[i].Value);
-					Console.ForegroundColor = (ConsoleColor)Enum.Parse(typeof(ConsoleColor), _config.Display.TextColor, true);
+					Console.ForegroundColor = _colorScheme.TextColor;
 				}
 			}
 			Console.WriteLine();
 		}
 
-		private static void ReadSerialPort()
+		private static async Task ReadSerialPortAsync()
+        {
+            byte[] buffer = new byte[1024];
+            while (_continue)
+            {
+                try
+                {
+                    int bytesRead = await _serialPort.BaseStream.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead > 0)
+                    {
+                        string message = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                        Console.WriteLine(message);
+                        await _semaphore.WaitAsync();
+                        try
+                        {
+                            _logMessage = message;
+                        }
+                        finally
+                        {
+                            _semaphore.Release();
+                        }
+                    }
+                }
+                catch (TimeoutException)
+                {
+                    // Handle timeout exception (if needed)
+                }
+                catch (IOException ex)
+                {
+                    Console.WriteLine($"Error reading from serial port: {ex.Message}");
+                    _continue = false;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"An error occurred while reading from serial port: {ex.Message}");
+                }
+            }
+        } // End of ReadSerialPortAsync()
+
+
+		private static async Task WriteToLogAsync()
 		{
-			// Continuously read from the serial port
+			// Continuously write to the log file while the _continue flag is true
 			while (_continue)
 			{
+				await _semaphore.WaitAsync();
 				try
 				{
-					string message = _serialPort.ReadLine(); // Read a line from the serial port
-					DisplayMessage(message); // Display the message with color handling
-					lock (_lockObject)
-					{
-						_logMessage = message; // Set the log message
-						Monitor.Pulse(_lockObject); // Signal the log thread
-					}
-				}
-				catch (TimeoutException)
-				{
-					// Handle timeout exception (if needed)
-				}
-				catch (IOException ex)
-				{
-					Console.WriteLine($"Error reading from serial port: {ex.Message}");
-					_continue = false; // Terminate the loop on IOException
-				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"An error occurred while reading from serial port: {ex.Message}");
-				}
-			}
-		} // End of ReadSerialPort()
-
-		private static void WriteToLog()
-		{
-			// Continuously write to the log file
-			while (_continue)
-			{
-				lock (_lockObject)
-				{
-					Monitor.Wait(_lockObject); // Wait for a signal from the read thread
+					// If there is a log message to write
 					if (_logMessage != null)
 					{
 						try
 						{
-							string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"); // Get current timestamp
-							_logFile.WriteLine($"{timestamp}: {_logMessage}"); // Write the log message with timestamp to the file
-							_logFile.Flush(); // Flush the stream to ensure the message is written
-							_logMessage = null; // Clear the log message
+							// Get current timestamp
+							string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+
+							// Write the log message with timestamp to the file
+							await _logFile.WriteLineAsync($"{timestamp}: {_logMessage}");
+
+							// Flush the stream to ensure the message is written
+							await _logFile.FlushAsync();
+
+							// Clear the log message
+							_logMessage = null;
 						}
 						catch (IOException ex)
 						{
+							// Handle IO exceptions that may occur while writing to the log file
 							Console.WriteLine($"Error writing to log file: {ex.Message}");
-							_continue = false; // Terminate the loop on IOException
+
+							// Stop the writing loop by setting the _continue flag to false
+							_continue = false;
 						}
 						catch (Exception ex)
 						{
+							// Handle any other exceptions that may occur
 							Console.WriteLine($"An error occurred while writing to log file: {ex.Message}");
 						}
 					}
 				}
+				finally
+				{
+					_semaphore.Release();
+				}
 			}
-		} // End of WriteToLog()
+		} // End of WriteToLogAsync()
 
-		private static void OpenSerialPort()
+		private static async Task OpenSerialPortAsync()
 		{
 			try
 			{
+				// Check if the serial port is not already open
 				if (!_serialPort.IsOpen)
 				{
+					// Attempt to open the serial port
 					_serialPort.Open();
 				}
 			}
+			catch (UnauthorizedAccessException ex)
+			{
+				// Handle access denied errors (e.g., when the port is in use by another application)
+				Console.WriteLine($"Access denied to the serial port: {ex.Message}");
+				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
+			}
+			catch (IOException ex)
+			{
+				// Handle IO exceptions that may occur while opening the serial port
+				Console.WriteLine($"IO error opening serial port: {ex.Message}");
+				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
+			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Error opening serial port: {ex.Message}");
-				TryReconnect();
+				// Handle any other exceptions that may occur
+				Console.WriteLine($"An error occurred while opening the serial port: {ex.Message}");
+				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
 			}
-		} // End of OpenSerialPort()
+		} // End of OpenSerialPortAsync()
 
-		private static void TryReconnect()
+		private static async Task TryReconnectAsync()
 		{
+			// Ensure only one reconnection attempt occurs at a time
 			if (!_reconnecting)
 			{
 				_reconnecting = true;
 				Console.WriteLine("Attempting to reconnect...");
-				Task.Run(async () =>
-				{
-					while (!_serialPort.IsOpen)
-					{
-						OpenSerialPort();
-						await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect again
-					}
-					Console.WriteLine("Reconnection successful.");
-					_reconnecting = false;
-				});
-			}
-		} // End of TryReconnect()
 
-		private static void CheckConnection()
+				// Continuously attempt to reconnect until successful
+				while (!_serialPort.IsOpen)
+				{
+					// Attempt to open the serial port asynchronously
+					await OpenSerialPortAsync();
+				}
+
+				Console.WriteLine("Reconnection successful.");
+				_reconnecting = false;
+			}
+		} // End of TryReconnectAsync()
+
+		private static async Task CheckConnectionAsync()
 		{
+			// Continuously check the connection status while the _continue flag is true
 			while (_continue)
 			{
+				// If the serial port is not open
 				if (!_serialPort.IsOpen)
 				{
-					TryReconnect();
+					// Attempt to reconnect
+					await TryReconnectAsync();
 				}
-				Thread.Sleep(1000); // Check connection status every 1 second
+
+				// Wait for 1 second before checking the connection status again
+				await Task.Delay(1000);
 			}
-		} // End of CheckConnection()
+		} // End of CheckConnectionAsync()
+
 	} // End of PortLog class
 } // End of COM_Port_Logger namespace

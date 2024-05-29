@@ -11,7 +11,14 @@ namespace COM_Port_Logger
 		{
 			try
 			{
-				PortLog.Start(); // Start the PortChat application
+				if (args.Length == 0)
+				{
+					Console.WriteLine("Please provide the console name as a command-line argument.");
+					return;
+				}
+
+				string consoleName = args[0];
+				PortLog.Start(consoleName); // Start the PortChat application
 			}
 			catch (Exception ex)
 			{

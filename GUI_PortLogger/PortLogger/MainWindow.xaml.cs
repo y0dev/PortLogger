@@ -17,8 +17,11 @@ namespace ConnectionIndicatorApp
 
 	enum LogLevel
 	{
+		DEBUG,
 		INFO,
-		DEBUG
+		WARNING,
+		ERROR,
+		CRITICAL
 	}
 
 	public partial class MainWindow : Window
@@ -78,7 +81,7 @@ namespace ConnectionIndicatorApp
 			{
 				// Close Original File
 				_logFile.Close();
-
+				
 				// Open a new file
 				_logFile = FileHandler.CreateLogFile("logs", "log.txt");
 
@@ -95,6 +98,9 @@ namespace ConnectionIndicatorApp
 			_listenerThread = new Thread(ListenForClients);
 			_listenerThread.IsBackground = true;
 			_listenerThread.Start();
+
+			_isConnected = true;
+			UpdateStatusIndicator(_isConnected);
 		}
 
 		private void StopServer()
@@ -113,8 +119,6 @@ namespace ConnectionIndicatorApp
 				while (true)
 				{
 					var client = _listener.AcceptTcpClient();
-					_isConnected = true;
-					UpdateStatusIndicator(_isConnected);
 
 					var clientAddress = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
 					_connectedClients.Add(clientAddress);
@@ -193,29 +197,11 @@ namespace ConnectionIndicatorApp
 
 		private void SetStatus(bool isConnected)
 		{
-			statusCanvas.Children.Clear();
-
-			var ellipse = new Ellipse
-			{
-				Width = 15,
-				Height = 15,
-				Fill = isConnected ? Brushes.Green : Brushes.Red
-			};
-			statusCanvas.Children.Add(ellipse);
-
-			var labelText = isConnected ? "Connected" : "Not Connected";
-			var textBlock = new TextBlock
-			{
-				Text = labelText,
-				Foreground = Brushes.Black,
-				HorizontalAlignment = HorizontalAlignment.Left,
-				VerticalAlignment = VerticalAlignment.Center,
-				Margin = new Thickness(20, 0, 0, 0)
-			};
-			statusCanvas.Children.Add(textBlock);
+			statusCircle.Fill = isConnected ? Brushes.Green : Brushes.Red;
+			statusTextBlock.Text = isConnected ? "Connected" : "Not Connected";
 
 			// Update connected clients list
-			connectedClientsTextBox.Text = string.Join(Environment.NewLine, _connectedClients);
+			//connectedClientsTextBox.Text = string.Join(Environment.NewLine, _connectedClients);
 		} // End of SetStatus()
 
 		// Event handler for the settings button click

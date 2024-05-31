@@ -54,6 +54,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Utilities\FileHandler.cs" />
+    <Compile Include="Utilities\IniFile.cs" />
     <Compile Include="Utilities\SerialPortReader.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

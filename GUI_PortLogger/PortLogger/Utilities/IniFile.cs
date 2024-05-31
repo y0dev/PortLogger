@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace PortLogger.Utilities
@@ -54,23 +55,31 @@ namespace PortLogger.Utilities
 
 		public void Load(string filePath)
 		{
-			_sections.Clear();
-			string currentSection = null;
-			foreach (string line in File.ReadLines(filePath))
+			if (File.Exists(filePath))
 			{
-				if (line.StartsWith("[") && line.EndsWith("]"))
+				// Clear existing sections
+				_sections.Clear();
+				string currentSection = null;
+				foreach (string line in File.ReadLines(filePath))
 				{
-					currentSection = line.Substring(1, line.Length - 2);
-					AddSection(currentSection);
-				}
-				else if (!string.IsNullOrWhiteSpace(line) && currentSection != null)
-				{
-					string[] parts = line.Split(new char[] { '=' }, 2);
-					if (parts.Length == 2)
+					if (line.StartsWith("[") && line.EndsWith("]"))
 					{
-						AddKey(currentSection, parts[0].Trim(), parts[1].Trim());
+						currentSection = line.Substring(1, line.Length - 2);
+						AddSection(currentSection);
+					}
+					else if (!string.IsNullOrWhiteSpace(line) && currentSection != null)
+					{
+						string[] parts = line.Split(new char[] { '=' }, 2);
+						if (parts.Length == 2)
+						{
+							AddKey(currentSection, parts[0].Trim(), parts[1].Trim());
+						}
 					}
 				}
+			}
+			else
+			{
+				Console.WriteLine("The configuration file does not exist.");
 			}
 		}
 	}

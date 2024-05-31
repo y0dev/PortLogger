@@ -36,7 +36,7 @@ namespace ConnectionIndicatorApp
 		private LogLevel _selectedLogLevel;
 		static LogFile _logFile; 
 		private string _selectedLoggingMode = "Ethernet";
-
+		private IniFile _iniFile = new IniFile();
 		private SerialPortReader _serialPortReader;
 
 		public MainWindow()
@@ -46,6 +46,9 @@ namespace ConnectionIndicatorApp
 
 			UpdateStatusIndicator(false);
 			LoadAvailableSerialPorts();
+
+			_iniFile.Load("config.ini");
+
 			_selectedLogLevel = LogLevel.INFO; // Default log level
 
 			// Set the default log level in the ComboBox

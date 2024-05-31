@@ -240,15 +240,21 @@ namespace ConnectionIndicatorApp
 			_iniFile.Save("config.ini");
 
 			_serialPortReader = new SerialPortReader(selectedSerialPort, baudRate);
+			_serialPortReader.DataReceived += SerialPort_DataReceived;
 		} // End of SerialPortsComboBox_SelectionChanged()
 
-		private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+		private void SerialPort_DataReceived(object sender, DataReceivedEventArgs e)
 		{
 			// Cast the sender object back to SerialPort
 			SerialPort serialPort = (SerialPort)sender;
 
 			// Read the data from the serial port
 			string data = serialPort.ReadExisting();
+
+			Dispatcher.Invoke((Action)(() =>
+			{
+				logTextBox.AppendText($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - INFO - {e.Data}{Environment.NewLine}");
+			}));
 
 			// Log the received data
 			LogMessage(data, LogLevel.INFO);

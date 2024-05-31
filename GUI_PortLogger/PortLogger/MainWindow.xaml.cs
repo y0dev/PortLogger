@@ -91,6 +91,11 @@ namespace ConnectionIndicatorApp
 			}
 		}
 
+		private void btnExit_Click(object sender, RoutedEventArgs e)
+		{
+
+		} // End of btnExit_Click()
+
 		private void StartServer()
 		{
 			_listener = new TcpListener(IPAddress.Any, 5000);

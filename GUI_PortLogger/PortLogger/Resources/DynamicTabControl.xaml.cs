@@ -37,8 +37,22 @@ namespace PortLogger.Resources
         /// <param name="content">The content of the new tab.</param>
 		public void AddTab(string header, string content)
 		{
-			var newTab = new TabItemViewModel { Header = header, Content = content };
-			Tabs.Add(newTab);
+			TabItemViewModel newTab = new TabItemViewModel { Header = header, Content = content }; ;
+			bool tabExists = false;
+			foreach(TabItemViewModel tab in Tabs)
+			{
+				if(header == tab.Header)
+				{
+					tabExists = true;
+					newTab = tab;
+					break;
+				}
+			}
+
+			if(!tabExists)
+			{
+				Tabs.Add(newTab);
+			}
 			SelectedTab = newTab;
 		}
 

@@ -53,7 +53,7 @@ namespace PortLogger.Utilities
 			}
 		}
 
-		public void Load(string filePath)
+		public bool Load(string filePath)
 		{
 			if (File.Exists(filePath))
 			{
@@ -76,10 +76,12 @@ namespace PortLogger.Utilities
 						}
 					}
 				}
+				return true;
 			}
 			else
 			{
 				Console.WriteLine("The configuration file does not exist.");
+				return false;
 			}
 		}
 	}

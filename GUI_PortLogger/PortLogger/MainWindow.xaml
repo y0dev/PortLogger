@@ -27,6 +27,8 @@
 
 				<Label Name="ipAddrLabel" Grid.Column="4" Margin="10">IP Address</Label>
 				<Label Name="ipAddrValueLabel" Grid.Column="5" Margin="10">127.0.0.0</Label>
+				<Label Name="serialPortLabel" Grid.Column="4" Margin="10" Visibility="Collapsed">Serial Port</Label>
+				<Label Name="serialPortValueLabel" Grid.Column="5" Margin="10" Visibility="Collapsed">COM1</Label>
 
 				<!-- Status Indicator -->
 				<Canvas Name="statusCanvas" Grid.Column="6" Grid.ColumnSpan="2" Margin="10">
@@ -88,7 +90,7 @@
 
 					<!-- Ethernet Settings -->
 					<StackPanel DockPanel.Dock="Top" Name="ethernetSettingsPanel" >
-						<Label Margin="10,5">Host/IP</Label>
+						<Label Margin="10,5">Server IP</Label>
 						<TextBox Name="hostTextBox" Margin="10,5"/>
 						<Label Margin="10,5">Port</Label>
 						<TextBox Name="portTextBox" Margin="10,5"/>

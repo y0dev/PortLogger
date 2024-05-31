@@ -47,13 +47,8 @@ namespace ConnectionIndicatorApp
 			UpdateStatusIndicator(false);
 			LoadAvailableSerialPorts();
 
-			_iniFile.Load("config.ini");
-
-			_selectedLogLevel = LogLevel.INFO; // Default log level
-
-			// Set the default log level in the ComboBox
-			logLevelComboBox.SelectedIndex = (int)_selectedLogLevel;
-
+			InitializeApplication();
+			
 			// Ensure the ComboBox selection logic runs after initialization
 			LogLevelComboBox_SelectionChanged(logLevelComboBox, null);
 			LoggingModeComboBox_SelectionChanged(loggingModeComboBox, null);
@@ -153,6 +148,11 @@ namespace ConnectionIndicatorApp
 
 				// Filter log messages based on the selected log level
 				FilterLogMessages();
+
+				_iniFile.AddKey("Debug", "LogLevel", selectedLogLevel);
+
+				// Save the INI file
+				_iniFile.Save("config.ini");
 			}
 		} // End of LogLevelComboBox_SelectionChanged()
 
@@ -165,8 +165,12 @@ namespace ConnectionIndicatorApp
 			if (_selectedLoggingMode == "Ethernet")
 			{
 				connLabel.Content = "Connected Clients";
-				ipAddrLabel.Content = "IP Address";
-				ipAddrValueLabel.Content = "127.0.0.0";
+
+				ipAddrLabel.Visibility = Visibility.Visible;
+				ipAddrValueLabel.Visibility = Visibility.Visible;
+				serialPortLabel.Visibility = Visibility.Collapsed;
+				serialPortValueLabel.Visibility = Visibility.Collapsed;
+
 				connectedClientsTextBox.Visibility = Visibility.Visible;
 				ethernetSettingsPanel.Visibility = Visibility.Visible;
 				serialSettingsPanel.Visibility = Visibility.Collapsed;
@@ -179,8 +183,11 @@ namespace ConnectionIndicatorApp
 			else if (_selectedLoggingMode == "Serial")
 			{
 				connLabel.Content = "Available Serial Ports";
-				ipAddrLabel.Content = "Serial Port";
-				ipAddrValueLabel.Content = "";
+				ipAddrLabel.Visibility = Visibility.Collapsed;
+				ipAddrValueLabel.Visibility = Visibility.Collapsed;
+				serialPortLabel.Visibility = Visibility.Visible;
+				serialPortValueLabel.Visibility = Visibility.Visible;
+
 				connectedClientsTextBox.Visibility = Visibility.Collapsed;
 				ethernetSettingsPanel.Visibility = Visibility.Collapsed;
 				serialSettingsPanel.Visibility = Visibility.Visible;
@@ -191,6 +198,12 @@ namespace ConnectionIndicatorApp
 				Grid.SetColumn(loggerGroupBox, 1);
 				Grid.SetColumnSpan(loggerGroupBox, 3);
 			}
+
+			_iniFile.AddKey("Connection", "Mode", _selectedLoggingMode);
+
+			// Save the INI file
+			_iniFile.Save("config.ini");
+
 		} // End of LoggingModeComboBox_SelectionChanged()
 
 
@@ -200,7 +213,7 @@ namespace ConnectionIndicatorApp
 			string selectedSerialPort = (string)serialPortsComboBox.SelectedItem;
 			ComboBoxItem selectedBaudRate = (ComboBoxItem)baudRateComboBox.SelectedItem;
 
-			ipAddrValueLabel.Content = selectedSerialPort;
+			serialPortValueLabel.Content = selectedSerialPort;
 
 			// Get the content of the selected item (which should be the baud rate as a string)
 			string baudRateString = selectedBaudRate.Content.ToString();
@@ -208,6 +221,10 @@ namespace ConnectionIndicatorApp
 			// Parse the baud rate string to an integer
 			int baudRate = int.Parse(baudRateString);
 
+			_iniFile.AddKey("Connection", "BaudRate", baudRateString);
+
+			// Save the INI file
+			_iniFile.Save("config.ini");
 
 			_serialPortReader = new SerialPortReader(selectedSerialPort, baudRate);
 		} // End of SerialPortsComboBox_SelectionChanged()
@@ -346,6 +363,105 @@ namespace ConnectionIndicatorApp
 		/*
 		 * Helper Functions
 		 */
+
+		private void InitializeApplication()
+		{
+			bool status = true;
+			status = _iniFile.Load("config.ini");
+			if(status)
+			{
+				// Get a value from the INI file
+				string logLevel = _iniFile.GetValue("Debug", "LogLevel");
+				string loggingMode = _iniFile.GetValue("Connection", "Mode");
+				string baudrate = _iniFile.GetValue("Connection", "BaudRate");
+				string ipAddress = _iniFile.GetValue("Ethernet", "IPAddress");
+				string ipAddressPrt = _iniFile.GetValue("Ethernet", "Port");
+
+				// Parse the selected log level string to the LogLevel enum
+				if (Enum.TryParse(logLevel, out LogLevel newLogLevel))
+				{
+					_selectedLogLevel = newLogLevel; // Log level from Config file
+				}
+
+				// Set the default log level in the ComboBox
+				logLevelComboBox.SelectedIndex = (int)_selectedLogLevel;
+
+				// Set the ComboBox selection based on the logging mode
+				if (loggingMode != null)
+				{
+					foreach (ComboBoxItem item in loggingModeComboBox.Items)
+					{
+						if (item.Content.ToString().Equals(loggingMode, StringComparison.OrdinalIgnoreCase))
+						{
+							loggingModeComboBox.SelectedItem = item;
+							break;
+						}
+					}
+
+					_selectedLoggingMode = (loggingModeComboBox.SelectedItem as ComboBoxItem)?.Content.ToString();
+				}
+
+				// Set the ComboBox selection based on the baud rate
+				if (baudrate != null)
+				{
+					foreach (ComboBoxItem item in baudRateComboBox.Items)
+					{
+						if (item.Content.ToString().Equals(baudrate, StringComparison.OrdinalIgnoreCase))
+						{
+							baudRateComboBox.SelectedItem = item;
+							break;
+						}
+					}
+				}
+
+				// Set the ComboBox selection based on the baud rate
+				if (ipAddress != null)
+				{
+					ipAddrValueLabel.Content = ipAddress;
+					hostTextBox.Text = ipAddress;
+				}
+
+				if(ipAddressPrt != null)
+				{
+					portTextBox.Text = ipAddressPrt;
+				}
+
+			}
+			else
+			{
+
+				// Get the selected log level from the ComboBox
+				string selectedLogLevel = (logLevelComboBox.SelectedItem as ComboBoxItem)?.Content.ToString();
+				string selectedLoggingMode = (loggingModeComboBox.SelectedItem as ComboBoxItem)?.Content.ToString();
+				string selectedBaudRate = (baudRateComboBox.SelectedItem as ComboBoxItem)?.Content.ToString();
+				string selectedIPAddress = ipAddrValueLabel.Content.ToString();
+				string selectedIPAddressPort = "8080";
+
+				portTextBox.Text = "8080";
+
+				// Save Debug configuration
+				_iniFile.AddSection("Debug");
+				_iniFile.AddKey("Debug", "LogLevel", selectedLogLevel); // Example: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+
+				// Add sections and keys
+				_iniFile.AddSection("Connection");
+				_iniFile.AddKey("Connection", "Mode", _selectedLoggingMode); // Example: "Ethernet" or "Serial"
+				_iniFile.AddKey("Connection", "BaudRate", selectedBaudRate); // Example: "9600" for baud rate
+
+
+				// Save Ethernet configuration
+				_iniFile.AddSection("Ethernet");
+				_iniFile.AddKey("Ethernet", "IPAddress", selectedIPAddress); // Example: IP address
+				_iniFile.AddKey("Ethernet", "Port", selectedIPAddressPort); // Example: Port number
+
+				// Initalizing Fields
+				portTextBox.Text = selectedIPAddressPort;
+				hostTextBox.Text = selectedIPAddress;
+
+				// Save the INI file
+				_iniFile.Save("config.ini");
+			}
+		}
 
 		private void FilterLogMessages()
 		{

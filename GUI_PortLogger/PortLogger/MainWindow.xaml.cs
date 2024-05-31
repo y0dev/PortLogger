@@ -1,7 +1,9 @@
 ﻿using COM_Port_Logger.Services;
+using PortLogger.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Ports;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -10,7 +12,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using YourNamespace;
 
 namespace ConnectionIndicatorApp
 {
@@ -26,53 +27,85 @@ namespace ConnectionIndicatorApp
 
 	public partial class MainWindow : Window
 	{
+		private bool _isInitialized;
 		private TcpListener _listener;
 		private Thread _listenerThread;
 		private bool _isConnected;
 		private List<string> logMessages = new List<string>();
 		private List<string> _connectedClients = new List<string>();
 		private LogLevel _selectedLogLevel;
-		static StreamWriter _logFile; // StreamWriter for log file
-		private string logFilePath = "log.txt"; // Path to the log file
+		static LogFile _logFile; 
+		private string _selectedLoggingMode = "Ethernet";
+
+		private SerialPortReader _serialPortReader;
 
 		public MainWindow()
 		{
 			InitializeComponent();
+			_isInitialized = true;
+
 			UpdateStatusIndicator(false);
-			logLevelComboBox.SelectionChanged += LogLevelComboBox_SelectionChanged;
+			LoadAvailableSerialPorts();
 			_selectedLogLevel = LogLevel.INFO; // Default log level
 
 			// Set the default log level in the ComboBox
 			logLevelComboBox.SelectedIndex = (int)_selectedLogLevel;
-		}
+
+			// Ensure the ComboBox selection logic runs after initialization
+			LogLevelComboBox_SelectionChanged(logLevelComboBox, null);
+			LoggingModeComboBox_SelectionChanged(loggingModeComboBox, null);
+
+		} // End of MainWindow()
+
+
+		/*
+		 * Action Functions
+		 */
 
 		private void btnStart_Click(object sender, RoutedEventArgs e)
 		{
-			StartServer();
+			// Open the log file
+			_logFile = FileHandler.CreateLogFile("logs", "log.txt");
+
+			if (_selectedLoggingMode == "Ethernet")
+			{
+				StartEthernetLogging();
+			}
+			else if (_selectedLoggingMode == "Serial")
+			{
+				StartSerialLogging();
+			}
+
 			btnStart.IsEnabled = false;
 			btnStop.IsEnabled = true;
 
-			// Open the log file
-			// string logDirectory = InputValidator.ValidateLogDirectory(_config.LogFile.BaseDirectory);
-			// string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
-			// logFilePath = System.IO.Path.Combine("logs", "log.txt");
-			_logFile = FileHandler.CreateLogFile("logs", "log.txt");
+			_isConnected = true;
+			UpdateStatusIndicator(_isConnected);
 
-			// Log that the server has started
-			LogMessage($"Server started successfully.", LogLevel.INFO);
-		}
+		} // End of btnStart_Click()
 
 		private void btnStop_Click(object sender, RoutedEventArgs e)
 		{
-			StopServer();
+			if (_selectedLoggingMode == "Ethernet")
+			{
+				StopEthernetLogging();
+			}
+			else if (_selectedLoggingMode == "Serial")
+			{
+				StopSerialLogging();
+			}
+
 			btnStart.IsEnabled = true;
 			btnStop.IsEnabled = false;
+
+			_isConnected = false;
+			UpdateStatusIndicator(_isConnected);
 
 			// Log that the server has stopped
 			LogMessage($"Server stopped.", LogLevel.INFO);
 
 			btnSaveLog.IsEnabled = logMessages.Count > 0;
-		}
+		} // End of btnStop_Click()
 
 		private void btnSaveLog_Click(object sender, RoutedEventArgs e)
 		{
@@ -81,7 +114,9 @@ namespace ConnectionIndicatorApp
 			{
 				// Close Original File
 				_logFile.Close();
-				
+				_logFile.SetAsReadOnly();
+
+
 				// Open a new file
 				_logFile = FileHandler.CreateLogFile("logs", "log.txt");
 
@@ -89,33 +124,106 @@ namespace ConnectionIndicatorApp
 
 				btnSaveLog.IsEnabled = logMessages.Count > 0;
 			}
-		}
+		} // End of btnSaveLog_Click()
 
 		private void btnExit_Click(object sender, RoutedEventArgs e)
 		{
 
+			Close();
 		} // End of btnExit_Click()
 
-		private void StartServer()
+		private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			_listener = new TcpListener(IPAddress.Any, 5000);
-			_listener.Start();
-			_listenerThread = new Thread(ListenForClients);
-			_listenerThread.IsBackground = true;
-			_listenerThread.Start();
+			if (!_isInitialized) return;
 
-			_isConnected = true;
-			UpdateStatusIndicator(_isConnected);
-		}
+			// Get the selected log level from the ComboBox
+			string selectedLogLevel = (logLevelComboBox.SelectedItem as ComboBoxItem)?.Content.ToString();
 
-		private void StopServer()
+			// Parse the selected log level string to the LogLevel enum
+			if (Enum.TryParse(selectedLogLevel, out LogLevel newLogLevel))
+			{
+				// Update the _selectedLogLevel
+				_selectedLogLevel = newLogLevel;
+
+				// Clear the logTextBox
+				logTextBox.Clear();
+
+				// Filter log messages based on the selected log level
+				FilterLogMessages();
+			}
+		} // End of LogLevelComboBox_SelectionChanged()
+
+		private void LoggingModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			_isConnected = false;
-			UpdateStatusIndicator(_isConnected);
+			if (!_isInitialized) return;
 
-			_listener.Stop();
-			_listenerThread.Join();
-		}
+			_selectedLoggingMode = ((ComboBoxItem)loggingModeComboBox.SelectedItem).Content.ToString();
+
+			if (_selectedLoggingMode == "Ethernet")
+			{
+				connLabel.Content = "Connected Clients";
+				ipAddrLabel.Content = "IP Address";
+				ipAddrValueLabel.Content = "127.0.0.0";
+				connectedClientsTextBox.Visibility = Visibility.Visible;
+				ethernetSettingsPanel.Visibility = Visibility.Visible;
+				serialSettingsPanel.Visibility = Visibility.Collapsed;
+				serialPortsComboBox.Visibility = Visibility.Collapsed;
+				connectionGroupBox.Visibility = Visibility.Visible;
+
+				Grid.SetColumn(loggerGroupBox, 2);
+				Grid.SetColumnSpan(loggerGroupBox, 2);
+			}
+			else if (_selectedLoggingMode == "Serial")
+			{
+				connLabel.Content = "Available Serial Ports";
+				ipAddrLabel.Content = "Serial Port";
+				ipAddrValueLabel.Content = "";
+				connectedClientsTextBox.Visibility = Visibility.Collapsed;
+				ethernetSettingsPanel.Visibility = Visibility.Collapsed;
+				serialSettingsPanel.Visibility = Visibility.Visible;
+				serialPortsComboBox.Visibility = Visibility.Visible;
+				connectionGroupBox.Visibility = Visibility.Collapsed;
+				LoadAvailableSerialPorts();
+
+				Grid.SetColumn(loggerGroupBox, 1);
+				Grid.SetColumnSpan(loggerGroupBox, 3);
+			}
+		} // End of LoggingModeComboBox_SelectionChanged()
+
+
+		private void SerialPortsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			// Get the selected item from the SerialPortComboBox
+			string selectedSerialPort = (string)serialPortsComboBox.SelectedItem;
+			ComboBoxItem selectedBaudRate = (ComboBoxItem)baudRateComboBox.SelectedItem;
+
+			ipAddrValueLabel.Content = selectedSerialPort;
+
+			// Get the content of the selected item (which should be the baud rate as a string)
+			string baudRateString = selectedBaudRate.Content.ToString();
+
+			// Parse the baud rate string to an integer
+			int baudRate = int.Parse(baudRateString);
+
+
+			_serialPortReader = new SerialPortReader(selectedSerialPort, baudRate);
+		} // End of SerialPortsComboBox_SelectionChanged()
+
+		private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+		{
+			// Cast the sender object back to SerialPort
+			SerialPort serialPort = (SerialPort)sender;
+
+			// Read the data from the serial port
+			string data = serialPort.ReadExisting();
+
+			// Log the received data
+			LogMessage(data, LogLevel.INFO);
+		} // End of SerialPort_DataReceived()
+
+		/*
+		 * Ethernet Helper Functions
+		 */
 
 		private void ListenForClients()
 		{
@@ -137,7 +245,7 @@ namespace ConnectionIndicatorApp
 			{
 				// Handle server stop scenario
 			}
-		}
+		} // End of ListenForClients()
 
 		private void HandleClient(TcpClient client)
 		{
@@ -174,57 +282,67 @@ namespace ConnectionIndicatorApp
 					UpdateStatusIndicator(_isConnected);
 				}
 			}
-		}
+		} // End of HandleClient()	
 
-		private void LogMessage(string message, LogLevel logLevel)
+		/*
+		 * Serial Helper Functions
+		 */
+
+		private void StartSerialLogging()
 		{
-			// Create the log message with the specified format
-			string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {logLevel.ToString()} - {message}";
+			// Add your code to start serial logging
+			var selectedPort = serialPortsComboBox.SelectedItem as string;
 
-			// Append the message to the logTextBox with a newline
-			logTextBox.AppendText(logEntry + Environment.NewLine);
-
-			// Write the log message to the log file
-			_logFile.WriteLine(logEntry);
-
-			// Add the log message to the logMessages list
-			logMessages.Add(logEntry);
-		} // End of LogMessage()
-
-		private void UpdateStatusIndicator(bool isConnected)
-		{
-			ThreadStart start = delegate
+			if (!string.IsNullOrEmpty(selectedPort))
 			{
-				Dispatcher.Invoke(DispatcherPriority.Normal, method: new Action<bool>(SetStatus), arg: isConnected);
-			};
-			new Thread(start).Start();
-		} // End of UpdateStatusIndicator()
+				// Initialize and start serial port logging using selectedPort
+				LogMessage($"Serial logging started on {selectedPort}", LogLevel.INFO);
+			}
 
-		private void SetStatus(bool isConnected)
+			_serialPortReader.StartReading();
+
+		} // End of StartSerialLogging()
+
+		private void StartEthernetLogging()
 		{
-			statusCircle.Fill = isConnected ? Brushes.Green : Brushes.Red;
-			statusTextBlock.Text = isConnected ? "Connected" : "Not Connected";
+			_listener = new TcpListener(IPAddress.Any, 5000);
+			_listener.Start();
+			_listenerThread = new Thread(ListenForClients);
+			_listenerThread.IsBackground = true;
+			_listenerThread.Start();
 
-			// Update connected clients list
-			//connectedClientsTextBox.Text = string.Join(Environment.NewLine, _connectedClients);
-		} // End of SetStatus()
 
-		// Event handler for the settings button click
-		private void Settings_Click(object sender, RoutedEventArgs e)
+			// Log that the server has started
+			LogMessage($"Server started successfully.", LogLevel.INFO);
+		} // End of StartEthernetLogging()
+
+
+		private void StopSerialLogging()
 		{
-			// Open the settings window
-			SettingsWindow settingsWindow = new SettingsWindow("192.168.1.45",2500);
-			settingsWindow.ShowDialog();
-		} // End of Settings_Click()
+			// Add your code to start serial logging
+			var selectedPort = serialPortsComboBox.SelectedItem as string;
+			if (!string.IsNullOrEmpty(selectedPort))
+			{
+				// Initialize and start serial port logging using selectedPort
+				LogMessage($"Serial logging stopped on {selectedPort}", LogLevel.INFO);
+			}
 
-		private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+			_serialPortReader.StopReading();
+
+		} // End of StopSerialLogging()
+
+		private void StopEthernetLogging()
 		{
-			// Clear the logTextBox
-			logTextBox.Clear();
+			_isConnected = false;
+			UpdateStatusIndicator(_isConnected);
 
-			// Filter log messages based on the selected log level
-			FilterLogMessages();
-		} // End of LogLevelComboBox_SelectionChanged()
+			_listener.Stop();
+			_listenerThread.Join();
+		} // End of StopEthernetLogging()
+
+		/*
+		 * Helper Functions
+		 */
 
 		private void FilterLogMessages()
 		{
@@ -260,5 +378,51 @@ namespace ConnectionIndicatorApp
 			// Replace this logic with your actual implementation
 			return true;
 		} // End of IsMessageLogLevelHigher()
+
+		private void LoadAvailableSerialPorts()
+		{
+			serialPortsComboBox.Items.Clear();
+			foreach (var port in SerialPort.GetPortNames())
+			{
+				serialPortsComboBox.Items.Add(port);
+			}
+		} // End of LoadAvailableSerialPorts()
+
+		private void UpdateStatusIndicator(bool isConnected)
+		{
+			ThreadStart start = delegate
+			{
+				Dispatcher.Invoke(DispatcherPriority.Normal, method: new Action<bool>(SetStatus), arg: isConnected);
+			};
+			new Thread(start).Start();
+		} // End of UpdateStatusIndicator()
+
+		private void SetStatus(bool isConnected)
+		{
+			statusCircle.Fill = isConnected ? Brushes.Green : Brushes.Red;
+			statusTextBlock.Text = isConnected ? "Connected" : "Not Connected";
+
+			// Update connected clients list
+			connectedClientsTextBox.Text = string.Join(Environment.NewLine, _connectedClients);
+		} // End of SetStatus()
+
+		private void LogMessage(string message, LogLevel logLevel)
+		{
+			// Check if the specified log level is at or above the threshold level
+			if (logLevel >= _selectedLogLevel)
+			{
+				// Create the log message with the specified format
+				string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {logLevel.ToString()} - {message}";
+
+				// Append the message to the logTextBox with a newline
+				logTextBox.AppendText(logEntry + Environment.NewLine);
+
+				// Write the log message to the log file
+				_logFile.WriteLine(logEntry);
+
+				// Add the log message to the logMessages list
+				logMessages.Add(logEntry);
+			}
+		} // End of LogMessage()
 	}
 }

@@ -17,11 +17,12 @@
 				</Grid.ColumnDefinitions>
 				<Label Name="logLevelLabel" Grid.Column="0" Margin="10">Log Level</Label>
 				<!-- Log Level Dropdown -->
-				<ComboBox Name="logLevelComboBox" Grid.Column="1" Margin="10">
-					<ComboBoxItem Content="INFO"/>
+				<ComboBox Name="logLevelComboBox" Grid.Column="1" Margin="10" SelectionChanged="LogLevelComboBox_SelectionChanged">
 					<ComboBoxItem Content="DEBUG"/>
+					<ComboBoxItem Content="INFO" IsSelected="True"/>
 					<ComboBoxItem Content="WARNING"/>
-					<!-- Add more log levels as needed -->
+					<ComboBoxItem Content="ERROR"/>
+					<ComboBoxItem Content="CRITICAL"/>
 				</ComboBox>
 
 				<Label Name="ipAddrLabel" Grid.Column="4" Margin="10">IP Address</Label>
@@ -30,12 +31,16 @@
 				<!-- Status Indicator -->
 				<Canvas Name="statusCanvas" Grid.Column="6" Grid.ColumnSpan="2" Margin="10">
 					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition/>
+							<RowDefinition/>
+						</Grid.RowDefinitions>
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition/>
 							<ColumnDefinition/>
 						</Grid.ColumnDefinitions>
-						<Ellipse Name="statusCircle" Grid.Column="0" Width="15" Height="15" Fill="Red" Margin="5" />
-						<TextBlock Name="statusTextBlock" Grid.Column="1" Text="Not Connected" HorizontalAlignment="Left" VerticalAlignment="Center" />
+						<Ellipse Name="statusCircle" Grid.Column="0" Width="15" Height="15" Fill="Red" Margin="0,0,5,0" Grid.RowSpan="2" />
+						<TextBlock Name="statusTextBlock" Grid.Column="1" Text="Not Connected" HorizontalAlignment="Left" VerticalAlignment="Center" Grid.RowSpan="2" />
 					</Grid>
 				</Canvas>
 			</Grid>
@@ -53,7 +58,7 @@
 				<ColumnDefinition/>
 				<ColumnDefinition/>
 			</Grid.ColumnDefinitions>
-			
+
 			<Button Name="btnStart" Grid.Column="1" Content="Start" Click="btnStart_Click" Margin="5,0,5,0"/>
 			<Button Name="btnStop" Grid.Column="2" Content="Stop" Click="btnStop_Click" Margin="5,0,5,0" IsEnabled="False"/>
 			<!-- Save Log Button -->
@@ -73,32 +78,54 @@
 
 			<GroupBox Grid.Column="0" Header="Settings">
 				<DockPanel>
-					<Label DockPanel.Dock="Top" Name="connLabel" Margin="10" Padding="1">Connection</Label>
-					<TextBox Name="connTextBox" DockPanel.Dock="Top">Sample Test</TextBox>
-					
+
 					<!-- ComboBox for Logging Mode -->
 					<Label DockPanel.Dock="Top" Margin="10">Logging Mode</Label>
 					<ComboBox Name="loggingModeComboBox" DockPanel.Dock="Top" Margin="10" SelectionChanged="LoggingModeComboBox_SelectionChanged">
 						<ComboBoxItem Content="Ethernet" IsSelected="True"/>
 						<ComboBoxItem Content="Serial"/>
 					</ComboBox>
+
+					<!-- Ethernet Settings -->
+					<StackPanel DockPanel.Dock="Top" Name="ethernetSettingsPanel" >
+						<Label Margin="10,5">Host/IP</Label>
+						<TextBox Name="hostTextBox" Margin="10,5"/>
+						<Label Margin="10,5">Port</Label>
+						<TextBox Name="portTextBox" Margin="10,5"/>
+					</StackPanel>
+
+					<!-- Serial Settings -->
+					<StackPanel DockPanel.Dock="Top" Name="serialSettingsPanel" Visibility="Collapsed">
+						<Label Margin="10,5">Serial Port</Label>
+						<ComboBox Name="serialPortsComboBox" Margin="10,5" SelectionChanged="SerialPortsComboBox_SelectionChanged"/>
+						<Label Margin="10,5">Baud Rate</Label>
+						<ComboBox Name="baudRateComboBox" Margin="10,5">
+							<ComboBoxItem Content="9600"/>
+							<ComboBoxItem Content="19200"/>
+							<ComboBoxItem Content="38400"/>
+							<ComboBoxItem Content="57600"/>
+							<ComboBoxItem Content="115200" IsSelected="True"/>
+						</ComboBox>
+					</StackPanel>
 					<Label></Label>
 				</DockPanel>
 			</GroupBox>
 
-			<GroupBox Grid.Column="1" Header="Connected Clients">
+			<GroupBox Name="connectionGroupBox" Grid.Column="1"  Margin="10,0">
 				<DockPanel>
+					<Label DockPanel.Dock="Top" Name="connLabel" Margin="10" Padding="1">Connected Clients</Label>
 
 					<TextBox Name="connectedClientsTextBox" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" 
-						IsReadOnly="True" DockPanel.Dock="Top"  ></TextBox>
+						IsReadOnly="True" DockPanel.Dock="Top" Visibility="Visible"/>
+
 				</DockPanel>
 			</GroupBox>
 
-			<GroupBox Grid.Column="2" Grid.ColumnSpan="2" Header="Logging">
+			<GroupBox Name="loggerGroupBox" Grid.Column="2" Grid.ColumnSpan="2" Header="Logging">
 				<DockPanel>
 
 					<TextBox Name="logTextBox" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" 
-						IsReadOnly="True" DockPanel.Dock="Top" ></TextBox>
+						IsReadOnly="True" DockPanel.Dock="Top"/>
 				</DockPanel>
 			</GroupBox>
 		</Grid>

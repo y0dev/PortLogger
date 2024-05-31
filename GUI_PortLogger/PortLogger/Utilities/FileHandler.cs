@@ -4,9 +4,55 @@ using System.IO;
 
 namespace COM_Port_Logger.Services
 {
+
+	public class LogFile
+	{
+		public string FileName { get; private set; }
+		private StreamWriter _streamWriter;
+
+		public LogFile(string fileName)
+		{
+			FileName = fileName;
+
+			// Create or open the log file with shared read access
+			FileStream fileStream = new FileStream(fileName, FileMode.Append, FileAccess.Write, FileShare.Read);
+			_streamWriter = new StreamWriter(fileStream); // Open file in append mode
+		}
+
+		public void WriteLine(string message)
+		{
+			try
+			{
+				_streamWriter.WriteLine(message);
+				_streamWriter.Flush();
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error writing to log file: {ex.Message}");
+			}
+		}
+
+		public void Close()
+		{
+			_streamWriter?.Close();
+		}
+
+		public void SetAsReadOnly()
+		{
+			try
+			{
+				File.SetAttributes(FileName, File.GetAttributes(FileName) | FileAttributes.ReadOnly);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error setting log file as read-only: {ex.Message}");
+			}
+		}
+	}
+
 	public static class FileHandler
 	{
-		public static StreamWriter CreateLogFile(string baseDirectory, string fileName)
+		public static LogFile CreateLogFile(string baseDirectory, string fileName)
 		{
 			// Get the current date and time
 			DateTime now = DateTime.Now;
@@ -23,11 +69,10 @@ namespace COM_Port_Logger.Services
 			// Create the log file path
 			string filePath = Path.Combine(directoryPath, String.Format("{0}_{1}", now.ToString("HH_mm_ss"), fileName));
 
-			// Create or open the log file with shared read access
-			FileStream fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
-			StreamWriter streamWriter = new StreamWriter(fileStream);
+			
+			LogFile logFile = new LogFile(filePath);
 
-			return streamWriter;
+			return logFile;
 		} // End of CreateLogFile()
 
 		public static List<string> SearchConfigFiles(string directoryPath)

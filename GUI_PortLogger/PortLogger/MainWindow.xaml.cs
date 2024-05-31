@@ -124,6 +124,14 @@ namespace ConnectionIndicatorApp
 			}
 		} // End of btnSaveLog_Click()
 
+		private void btnAddSerialPort_Click(object sender, RoutedEventArgs e)
+		{
+			string portName = serialPortsComboBox.SelectedItem.ToString();
+			string baudRate = baudRateComboBox.SelectedItem.ToString();
+
+			dynamicTabControl.AddTab(portName, $"Started logging for {portName} at {baudRate} baud...");
+		} // End of btnAddSerialPort_Click()
+
 		private void btnExit_Click(object sender, RoutedEventArgs e)
 		{
 
@@ -177,6 +185,8 @@ namespace ConnectionIndicatorApp
 				serialPortsComboBox.Visibility = Visibility.Collapsed;
 				connectionGroupBox.Visibility = Visibility.Visible;
 
+				dynamicTabControl.Visibility = Visibility.Collapsed;
+
 				Grid.SetColumn(loggerGroupBox, 2);
 				Grid.SetColumnSpan(loggerGroupBox, 2);
 			}
@@ -193,6 +203,9 @@ namespace ConnectionIndicatorApp
 				serialSettingsPanel.Visibility = Visibility.Visible;
 				serialPortsComboBox.Visibility = Visibility.Visible;
 				connectionGroupBox.Visibility = Visibility.Collapsed;
+
+				dynamicTabControl.Visibility = Visibility.Visible;
+
 				LoadAvailableSerialPorts();
 
 				Grid.SetColumn(loggerGroupBox, 1);
@@ -461,7 +474,7 @@ namespace ConnectionIndicatorApp
 				// Save the INI file
 				_iniFile.Save("config.ini");
 			}
-		}
+		} // End of InitializeApplication()
 
 		private void FilterLogMessages()
 		{

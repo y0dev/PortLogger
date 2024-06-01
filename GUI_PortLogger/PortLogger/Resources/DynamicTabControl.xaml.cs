@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PortLogger.Utilities;
+using System;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -6,9 +7,19 @@ using System.Windows.Input;
 
 namespace PortLogger.Resources
 {
-    /// <summary>
-    /// A UserControl that represents a dynamic TabControl with the ability to close tabs.
-    /// </summary>
+	/// <summary>
+	/// ViewModel for a tab item.
+	/// </summary>
+	public class TabItemViewModel
+	{
+		public string Header { get; set; }
+		public TextBox LogTextBox { get; set; }
+		public SerialPortReader SerialPortReader { get; set; }
+	}
+
+	/// <summary>
+	/// A UserControl that represents a dynamic TabControl with the ability to close tabs.
+	/// </summary>
 	public partial class DynamicTabControl : UserControl
 	{
         // Collection of tab items
@@ -35,9 +46,36 @@ namespace PortLogger.Resources
         /// </summary>
         /// <param name="header">The header of the new tab.</param>
         /// <param name="content">The content of the new tab.</param>
-		public void AddTab(string header, string content)
+		public void AddTab(string header, string portName, string baudRateString)
 		{
-			TabItemViewModel newTab = new TabItemViewModel { Header = header, Content = content }; ;
+			int baudRate;
+			if (!int.TryParse(baudRateString, out baudRate))
+			{
+				baudRate = 115200; // Default value or handle error
+			}
+
+			var logTextBox = new TextBox
+			{
+				VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+				HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+				IsReadOnly = true
+			};
+
+			var serialPortReader = new SerialPortReader(portName, baudRate);
+			serialPortReader.DataReceived += (s, e) =>
+			{
+				Dispatcher.Invoke((Action)(() =>
+				{
+					logTextBox.AppendText($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - INFO - {e.Data}{Environment.NewLine}");
+				}));
+			};
+
+			TabItemViewModel newTab = new TabItemViewModel
+			{
+				Header = header,
+				LogTextBox = logTextBox,
+				SerialPortReader = serialPortReader
+			};
 			bool tabExists = false;
 			foreach(TabItemViewModel tab in Tabs)
 			{
@@ -67,16 +105,26 @@ namespace PortLogger.Resources
 				Tabs.Remove(tab);
 			}
 		}
+
+		/// <summary>
+		/// Start serial port on the specified tab.
+		/// </summary>
+		/// <param name="sender">Sender of the action</param>
+		public void StartButton_Click(object sender, RoutedEventArgs e)
+		{
+			SelectedTab?.SerialPortReader.StartReading();
+		}
+
+		/// <summary>
+		/// Stop serial port on the specified tab.
+		/// </summary>
+		/// <param name="sender">Sender of the action</param>
+		public void StopButton_Click(object sender, RoutedEventArgs e)
+		{
+			SelectedTab?.SerialPortReader.StopReading();
+		}
 	}
 
-    /// <summary>
-    /// ViewModel for a tab item.
-    /// </summary>
-	public class TabItemViewModel
-	{
-		public string Header { get; set; }
-		public string Content { get; set; }
-	}
 
     /// <summary>
     /// A generic command that delegates execution to specified actions.

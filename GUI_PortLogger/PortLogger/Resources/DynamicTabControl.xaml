@@ -7,7 +7,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 	<DockPanel>
-		<TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}">
+		<TabControl Name="serialPortTabControl" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}">
 			<TabControl.ItemTemplate>
 				<DataTemplate>
 					<DockPanel>
@@ -19,7 +19,7 @@
 			</TabControl.ItemTemplate>
 			<TabControl.ContentTemplate>
 				<DataTemplate>
-					<TextBox Text="{Binding Content}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+					<TextBox Text="{Binding LogTextBox}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                              IsReadOnly="True"/>
 				</DataTemplate>
 			</TabControl.ContentTemplate>

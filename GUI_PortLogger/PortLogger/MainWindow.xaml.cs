@@ -71,7 +71,7 @@ namespace ConnectionIndicatorApp
 			}
 			else if (_selectedLoggingMode == "Serial")
 			{
-				StartSerialLogging();
+				StartSerialLogging(sender, e);
 			}
 
 			btnStart.IsEnabled = false;
@@ -90,7 +90,7 @@ namespace ConnectionIndicatorApp
 			}
 			else if (_selectedLoggingMode == "Serial")
 			{
-				StopSerialLogging();
+				StopSerialLogging(sender, e);
 			}
 
 			btnStart.IsEnabled = true;
@@ -129,7 +129,7 @@ namespace ConnectionIndicatorApp
 			string portName = serialPortsComboBox.SelectedItem.ToString();
 			string baudRate = baudRateComboBox.SelectedItem.ToString();
 
-			dynamicTabControl.AddTab(portName, $"Started logging for {portName} at {baudRate} baud...");
+			dynamicTabControl.AddTab(portName, portName, baudRate);
 		} // End of btnAddSerialPort_Click()
 
 		private void btnExit_Click(object sender, RoutedEventArgs e)
@@ -327,7 +327,7 @@ namespace ConnectionIndicatorApp
 		 * Serial Helper Functions
 		 */
 
-		private void StartSerialLogging()
+		private void StartSerialLogging(object sender, RoutedEventArgs e)
 		{
 			// Add your code to start serial logging
 			var selectedPort = serialPortsComboBox.SelectedItem as string;
@@ -338,6 +338,7 @@ namespace ConnectionIndicatorApp
 				LogMessage($"Serial logging started on {selectedPort}", LogLevel.INFO);
 			}
 
+			dynamicTabControl.StartButton_Click(sender, e);
 			_serialPortReader.StartReading();
 
 		} // End of StartSerialLogging()
@@ -356,7 +357,7 @@ namespace ConnectionIndicatorApp
 		} // End of StartEthernetLogging()
 
 
-		private void StopSerialLogging()
+		private void StopSerialLogging(object sender, RoutedEventArgs e)
 		{
 			// Add your code to start serial logging
 			var selectedPort = serialPortsComboBox.SelectedItem as string;
@@ -366,6 +367,7 @@ namespace ConnectionIndicatorApp
 				LogMessage($"Serial logging stopped on {selectedPort}", LogLevel.INFO);
 			}
 
+			dynamicTabControl.StopButton_Click(sender, e);
 			_serialPortReader.StopReading();
 
 		} // End of StopSerialLogging()

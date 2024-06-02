@@ -2,8 +2,17 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace COM_Port_Logger.Services
+namespace PortLogger.Utilities
 {
+
+	public enum LogLevel
+	{
+		DEBUG,
+		INFO,
+		WARNING,
+		ERROR,
+		CRITICAL
+	}
 
 	public class LogFile
 	{

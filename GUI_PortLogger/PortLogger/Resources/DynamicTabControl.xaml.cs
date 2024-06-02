@@ -1,4 +1,5 @@
-﻿using PortLogger.Utilities;
+﻿using ConnectionIndicatorApp;
+using PortLogger.Utilities;
 using System;
 using System.Collections.ObjectModel;
 using System.Windows;
@@ -15,6 +16,7 @@ namespace PortLogger.Resources
 		public string Header { get; set; }
 		public TextBox LogTextBox { get; set; }
 		public SerialPortReader SerialPortReader { get; set; }
+		public LogFile SerialLogFile;
 	}
 
 	/// <summary>
@@ -61,6 +63,9 @@ namespace PortLogger.Resources
 				IsReadOnly = true
 			};
 
+			// Open the log file
+			LogFile logFile = FileHandler.CreateLogFile("logs", "log.txt");
+
 			var serialPortReader = new SerialPortReader(portName, baudRate);
 			serialPortReader.DataReceived += (s, e) =>
 			{
@@ -74,7 +79,8 @@ namespace PortLogger.Resources
 			{
 				Header = header,
 				LogTextBox = logTextBox,
-				SerialPortReader = serialPortReader
+				SerialPortReader = serialPortReader,
+				SerialLogFile = logFile
 			};
 			bool tabExists = false;
 			foreach(TabItemViewModel tab in Tabs)
@@ -122,6 +128,15 @@ namespace PortLogger.Resources
 		public void StopButton_Click(object sender, RoutedEventArgs e)
 		{
 			SelectedTab?.SerialPortReader.StopReading();
+		}
+
+		/// <summary>
+		/// Stop serial port on the specified tab.
+		/// </summary>
+		/// <param name="sender">Sender of the action</param>
+		public void LogMessage(string message)
+		{
+			SelectedTab?.SerialLogFile.WriteLine(message);
 		}
 	}
 

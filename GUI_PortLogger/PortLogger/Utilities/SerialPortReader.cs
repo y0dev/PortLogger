@@ -34,7 +34,7 @@ namespace PortLogger.Utilities
 			_isReading = false;
 		}
 
-		public bool StartReading()
+		public void StartReading()
 		{
 			if (!_isReading)
 			{
@@ -49,26 +49,20 @@ namespace PortLogger.Utilities
 				catch (TimeoutException ex)
 				{
 					Console.WriteLine($"Timed Out: {ex.Message}");
-					return false;
 				}
 				catch (InvalidOperationException ex)
 				{
 					Console.WriteLine($"Invalid Operation: {ex.Message}");
-					return false;
 				}
 				catch (IOException ex)
 				{
 					Console.WriteLine($"IO Exception: {ex.Message}");
-					return false;
 				}
 				catch (Exception ex)
 				{
 					Console.WriteLine($"Exception: {ex.Message}");
-					return false;
 				}
-				return true;
 			}
-			return true;
 		}
 
 		public void StopReading()

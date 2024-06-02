@@ -1,5 +1,4 @@
-﻿using COM_Port_Logger.Services;
-using PortLogger.Utilities;
+﻿using PortLogger.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,15 +15,6 @@ using System.Windows.Threading;
 namespace ConnectionIndicatorApp
 {
 
-	enum LogLevel
-	{
-		DEBUG,
-		INFO,
-		WARNING,
-		ERROR,
-		CRITICAL
-	}
-
 	public partial class MainWindow : Window
 	{
 		private bool _isInitialized;
@@ -37,7 +27,6 @@ namespace ConnectionIndicatorApp
 		static LogFile _logFile; 
 		private string _selectedLoggingMode = "Ethernet";
 		private IniFile _iniFile = new IniFile();
-		private SerialPortReader _serialPortReader;
 
 		public MainWindow()
 		{
@@ -238,9 +227,6 @@ namespace ConnectionIndicatorApp
 
 			// Save the INI file
 			_iniFile.Save("config.ini");
-
-			_serialPortReader = new SerialPortReader(selectedSerialPort, baudRate);
-			_serialPortReader.DataReceived += SerialPort_DataReceived;
 		} // End of SerialPortsComboBox_SelectionChanged()
 
 		private void SerialPort_DataReceived(object sender, DataReceivedEventArgs e)
@@ -339,7 +325,6 @@ namespace ConnectionIndicatorApp
 			}
 
 			dynamicTabControl.StartButton_Click(sender, e);
-			_serialPortReader.StartReading();
 
 		} // End of StartSerialLogging()
 
@@ -368,7 +353,6 @@ namespace ConnectionIndicatorApp
 			}
 
 			dynamicTabControl.StopButton_Click(sender, e);
-			_serialPortReader.StopReading();
 
 		} // End of StopSerialLogging()
 
@@ -554,14 +538,21 @@ namespace ConnectionIndicatorApp
 				// Create the log message with the specified format
 				string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {logLevel.ToString()} - {message}";
 
-				// Append the message to the logTextBox with a newline
-				logTextBox.AppendText(logEntry + Environment.NewLine);
+				if (_selectedLoggingMode == "Ethernet")
+				{
+					// Append the message to the logTextBox with a newline
+					logTextBox.AppendText(logEntry + Environment.NewLine);
 
-				// Write the log message to the log file
-				_logFile.WriteLine(logEntry);
+					// Write the log message to the log file
+					_logFile.WriteLine(logEntry);
 
-				// Add the log message to the logMessages list
-				logMessages.Add(logEntry);
+					// Add the log message to the logMessages list
+					logMessages.Add(logEntry);
+				}
+				else if (_selectedLoggingMode == "Serial")
+				{
+					dynamicTabControl.LogMessage(logEntry);
+				}
 			}
 		} // End of LogMessage()
 	}

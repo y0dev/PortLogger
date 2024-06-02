@@ -2,13 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 		xmlns:local="clr-namespace:PortLogger.Resources"
-		Title="Connection Indicator App" Height="450" Width="800">
+		xmlns:local1="clr-namespace:PortLogger.Utilities"
+		Title="Connection Indicator App" Height="750" Width="1000">
 	<Window.Resources>
-		<ResourceDictionary>
-			<ResourceDictionary.MergedDictionaries>
-				
-			</ResourceDictionary.MergedDictionaries>
-		</ResourceDictionary>
+		<local1:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
 	</Window.Resources>
 	<DockPanel>
 		<DockPanel DockPanel.Dock="Top">
@@ -69,8 +66,10 @@
 				<ColumnDefinition/>
 			</Grid.ColumnDefinitions>
 
-			<Button Name="btnStart" Grid.Column="1" Content="Start" Click="btnStart_Click" Margin="5,0,5,0"/>
-			<Button Name="btnStop" Grid.Column="2" Content="Stop" Click="btnStop_Click" Margin="5,0,5,0" IsEnabled="False"/>
+			<Button Name="btnStart" Grid.Column="1" Content="Start" Click="btnStart_Click" Margin="5,0,5,0"
+					IsEnabled="{Binding Path=IsRunning, Converter={StaticResource InverseBooleanConverter}}"/>
+			<Button Name="btnStop" Grid.Column="2" Content="Stop" Click="btnStop_Click" Margin="5,0,5,0" 
+					IsEnabled="{Binding Path=IsRunning}"/>
 			<!-- Save Log Button -->
 			<Button Name="btnSaveLog" Grid.Column="3" Content="Save Log" Click="btnSaveLog_Click" Margin="5,0,5,0" IsEnabled="False"
 					ToolTip="Save log file and create a new one"/>

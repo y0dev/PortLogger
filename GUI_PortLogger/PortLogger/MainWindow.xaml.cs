@@ -51,11 +51,11 @@ namespace ConnectionIndicatorApp
 
 		private void btnStart_Click(object sender, RoutedEventArgs e)
 		{
-			// Open the log file
-			_logFile = FileHandler.CreateLogFile("logs", "log.txt");
 
 			if (_selectedLoggingMode == "Ethernet")
 			{
+				// Open the log file
+				_logFile = FileHandler.CreateLogFile("logs", "enet_log.txt");
 				StartEthernetLogging();
 			}
 			else if (_selectedLoggingMode == "Serial")
@@ -105,7 +105,7 @@ namespace ConnectionIndicatorApp
 
 
 				// Open a new file
-				_logFile = FileHandler.CreateLogFile("logs", "log.txt");
+				_logFile = FileHandler.CreateLogFile("logs", "enet_log.txt");
 
 				logMessages = new List<string>();
 
@@ -324,7 +324,10 @@ namespace ConnectionIndicatorApp
 				LogMessage($"Serial logging started on {selectedPort}", LogLevel.INFO);
 			}
 
-			dynamicTabControl.StartButton_Click(sender, e);
+			if (dynamicTabControl.SelectedTab != null)
+			{
+				dynamicTabControl.StartSerialPort(dynamicTabControl.SelectedTab);
+			}
 
 		} // End of StartSerialLogging()
 
@@ -352,7 +355,10 @@ namespace ConnectionIndicatorApp
 				LogMessage($"Serial logging stopped on {selectedPort}", LogLevel.INFO);
 			}
 
-			dynamicTabControl.StopButton_Click(sender, e);
+			if (dynamicTabControl.SelectedTab != null)
+			{
+				dynamicTabControl.StopSerialPort(dynamicTabControl.SelectedTab);
+			}
 
 		} // End of StopSerialLogging()
 
@@ -530,7 +536,7 @@ namespace ConnectionIndicatorApp
 			connectedClientsTextBox.Text = string.Join(Environment.NewLine, _connectedClients);
 		} // End of SetStatus()
 
-		private void LogMessage(string message, LogLevel logLevel)
+		public void LogMessage(string message, LogLevel logLevel)
 		{
 			// Check if the specified log level is at or above the threshold level
 			if (logLevel >= _selectedLogLevel)
@@ -551,7 +557,7 @@ namespace ConnectionIndicatorApp
 				}
 				else if (_selectedLoggingMode == "Serial")
 				{
-					dynamicTabControl.LogMessage(logEntry);
+					dynamicTabControl.LogMessage(logEntry, logLevel);
 				}
 			}
 		} // End of LogMessage()

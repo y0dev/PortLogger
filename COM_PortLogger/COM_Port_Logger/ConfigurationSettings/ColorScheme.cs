@@ -28,6 +28,14 @@ namespace COM_Port_Logger.ConfigurationSettings
 		public static ColorScheme GruvboxDark => new ColorScheme(ConsoleColor.DarkGray, ConsoleColor.White, ConsoleColor.Yellow);
 		public static ColorScheme GruvboxLight => new ColorScheme(ConsoleColor.White, ConsoleColor.DarkGray, ConsoleColor.Yellow);
 		public static ColorScheme Nord => new ColorScheme(ConsoleColor.DarkBlue, ConsoleColor.Gray, ConsoleColor.Cyan);
+		public static ColorScheme Ocean => new ColorScheme(ConsoleColor.DarkCyan, ConsoleColor.White, ConsoleColor.Cyan);
+		public static ColorScheme Desert => new ColorScheme(ConsoleColor.DarkYellow, ConsoleColor.Black, ConsoleColor.DarkRed);
+		public static ColorScheme Retro => new ColorScheme(ConsoleColor.Black, ConsoleColor.Green, ConsoleColor.Yellow);
+		public static ColorScheme Cyberpunk => new ColorScheme(ConsoleColor.Black, ConsoleColor.Magenta, ConsoleColor.Cyan);
+		public static ColorScheme Twilight => new ColorScheme(ConsoleColor.DarkMagenta, ConsoleColor.White, ConsoleColor.DarkYellow);
+		public static ColorScheme Forest => new ColorScheme(ConsoleColor.DarkGreen, ConsoleColor.White, ConsoleColor.Yellow);
+		public static ColorScheme Sunset => new ColorScheme(ConsoleColor.DarkYellow, ConsoleColor.DarkRed, ConsoleColor.Yellow);
+
 
 		public static ColorScheme GetColorScheme(string schemeName)
 		{
@@ -51,6 +59,20 @@ namespace COM_Port_Logger.ConfigurationSettings
 					return GruvboxLight;
 				case "nord":
 					return Nord;
+				case "ocean":
+					return Ocean;
+				case "desert":
+					return Desert;
+				case "retro":
+					return Retro;
+				case "cyberpunk":
+					return Cyberpunk;
+				case "twilight":
+					return Twilight;
+				case "forest":
+					return Forest;
+				case "sunset":
+					return Sunset;
 				default:
 					return Default;
 			}

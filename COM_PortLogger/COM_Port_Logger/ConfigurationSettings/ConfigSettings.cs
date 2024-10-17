@@ -31,7 +31,8 @@ namespace COM_Port_Logger.ConfigurationSettings
 
 	public class DisplaySettings
 	{
-		public string ColorScheme { get; set; } = "DarkMode";
 		public string ConsoleName { get; set; }
+		public string ColorScheme { get; set; } = "DarkMode";
+		public ushort FontSize { get; set; } = 24;
 	}
 }

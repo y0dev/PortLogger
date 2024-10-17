@@ -169,7 +169,6 @@ namespace COM_Port_Logger
 				Console.WriteLine($"COM Port: {_config.SerialPort.PortName}");
 				Console.WriteLine($"Baud Rate: {_config.SerialPort.BaudRate}");
 				Console.WriteLine($"Color Scheme: {_config.Display.ColorScheme}");
-				Console.WriteLine($"Console Title: {_config.Display.ConsoleName}");
 				Console.WriteLine("--------------------------------------\n");
 
 				Console.WriteLine("Type QUIT to exit");

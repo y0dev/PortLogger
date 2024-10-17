@@ -21,14 +21,16 @@ namespace COM_Port_Logger.Services
 			string directoryPath = Path.Combine(baseDirectory,
 				now.ToString("yyyy"),
 				now.ToString("MM_MMM"),
-				now.ToString("MM_DD"),
-				now.ToString("HH_mm_ss"));
+				now.ToString("MM_dd"));
 
 			// Ensure the directory exists
 			Directory.CreateDirectory(directoryPath);
 
+			// Remove the .txt extension from the filename
+			string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
+
 			// Create the log file path
-			string filePath = Path.Combine(directoryPath, filename);
+			string filePath = Path.Combine(directoryPath, $"{now:HH_mm_ss}_{fileNameWithoutExtension}.txt");
 
 			// Create or open the log file with shared read access
 			FileStream fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);

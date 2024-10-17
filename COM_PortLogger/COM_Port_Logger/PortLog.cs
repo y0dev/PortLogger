@@ -13,9 +13,9 @@ namespace COM_Port_Logger
 	{
 		static bool _continue; // Flag to control the continuation of threads
 		static SerialPort _serialPort; // SerialPort object
-		static StreamWriter _logFile; // StreamWriter for log file
+		static LogFileResult _logFileResult; // StreamWriter for log file
 		static string _logMessage; // Message to be logged
-		static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1); // Semaphore for async synchronization
+		static readonly object _lock = new object(); // Lock object for synchronization
 		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
 		static ConfigSettings _config; // Configuration settings
 		static ColorScheme _colorScheme; // Color scheme for console
@@ -36,10 +36,6 @@ namespace COM_Port_Logger
 
 				_colorScheme = ColorScheme.GetColorScheme(_config.Display.ColorScheme);
 
-				ConsoleColor bgColor = Console.BackgroundColor;
-				ConsoleColor fgColor = Console.ForegroundColor;
-				string title = Console.Title;
-
 				// Apply display settings
 				ApplyDisplaySettings();
 
@@ -54,24 +50,22 @@ namespace COM_Port_Logger
 				_serialPort.ReadTimeout = 500;
 				_serialPort.WriteTimeout = 500;
 
-				// Open the serial port and log file with shared read access
+				// Open the serial port
 				_serialPort.Open();
+
 				// Open the log file
 				string logDirectory = InputValidator.ValidateLogDirectory(_config.LogFile.BaseDirectory);
 				string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
-				string logFilePath = Path.Combine(logDirectory, logFileName);
-				_logFile = FileHandler.CreateLogFile(logFilePath);
+				_logFileResult = FileHandler.CreateLogFile(logDirectory, logFileName);
+				string logFilePath = _logFileResult.FilePath;
 
 				_continue = true; // Set continuation flag to true
 
-				// Start background tasks for reading from serial port and writing to log file
-				_ = Task.Run(ReadSerialPortAsync);
-				_ = Task.Run(WriteToLogAsync);
-				_ = Task.Run(CheckConnectionAsync);
-
-				// Define timeout duration (in milliseconds)
-				int timeoutMilliseconds = 5 * TimeConstants.Minutes; // 5 minutes
-
+				// Start background threads for reading from serial port and writing to log file
+				ThreadPool.QueueUserWorkItem(ReadSerialPort);
+				ThreadPool.QueueUserWorkItem(WriteToLog);
+				ThreadPool.QueueUserWorkItem(CheckConnection);
+				
 				Console.WriteLine("Type QUIT to exit");
 
 				// Main loop to read user input and send to the serial port
@@ -80,22 +74,8 @@ namespace COM_Port_Logger
 					string message = Console.ReadLine();
 					if (string.IsNullOrEmpty(message))
 					{
-						// Start timeout countdown if there is no user input
-						DateTime startTime = DateTime.Now;
-						while ((DateTime.Now - startTime).TotalMilliseconds < timeoutMilliseconds)
-						{
-							if (!string.IsNullOrEmpty(Console.ReadLine()))
-							{
-								// Reset timeout countdown if user input is detected
-								startTime = DateTime.Now;
-							}
-							else
-							{
-								// Exit the program if timeout expires
-								_continue = false;
-								break;
-							}
-						}
+						// Handle empty message
+						continue;
 					}
 					else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
 					{
@@ -108,7 +88,112 @@ namespace COM_Port_Logger
 				}
 
 				_serialPort.Close();
-				_logFile.Close();
+				_logFileResult.StreamWriter.Close();
+				Console.ResetColor();
+
+				// Set log file as read-only
+				File.SetAttributes(logFilePath, File.GetAttributes(logFilePath) | FileAttributes.ReadOnly);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"An error occurred: {ex.Message}");
+				Console.ResetColor();
+			}
+		} // End of Start()
+
+		public static void Start(string baseDirectory, string logFileName, string comPort, int baudRate, string colorSchemeName, string consoleTitle)
+		{
+			try
+			{
+				// Initialize custom configuration settings based on the provided parameters
+				_config = new ConfigSettings
+				{
+					LogFile = new LogFileSettings
+					{
+						BaseDirectory = InputValidator.ValidateLogDirectory(baseDirectory),
+						FileName = logFileName // You can add an additional parameter for the log file name if needed
+					},
+					SerialPort = new SerialPortConfig
+					{
+						PortName = InputValidator.ValidatePortName(comPort),
+						BaudRate = baudRate, // Default baud rate, you can add an extra parameter for this if needed
+						Parity = "None",  // Default parity
+						DataBits = 8,     // Default data bits
+						StopBits = "One", // Default stop bits
+						Handshake = "None"// Default handshake
+					},
+					Display = new DisplaySettings
+					{
+						ColorScheme = colorSchemeName,
+						ConsoleName = consoleTitle
+					}
+				};
+
+				// Set the color scheme based on the passed color scheme name
+				_colorScheme = ColorScheme.GetColorScheme(colorSchemeName);
+
+
+
+				// Apply display settings for console background, foreground color, and title
+				ApplyDisplaySettings();
+
+				// Initialize and configure the SerialPort
+				_serialPort = new SerialPort();
+				_serialPort.PortName = InputValidator.ValidatePortName(comPort);
+				_serialPort.BaudRate = _config.SerialPort.BaudRate;
+				_serialPort.Parity = InputValidator.ValidateParity(_config.SerialPort.Parity);
+				_serialPort.DataBits = _config.SerialPort.DataBits;
+				_serialPort.StopBits = InputValidator.ValidateStopBits(_config.SerialPort.StopBits);
+				_serialPort.Handshake = InputValidator.ValidateHandshake(_config.SerialPort.Handshake);
+				_serialPort.ReadTimeout = 500;
+				_serialPort.WriteTimeout = 500;
+
+				// Open the serial port
+				_serialPort.Open();
+
+				// Combine base directory and log file name to form the full log file path
+				_logFileResult = FileHandler.CreateLogFile(_config.LogFile.BaseDirectory, _config.LogFile.FileName);
+				string logFilePath = _logFileResult.FilePath;
+
+				_continue = true; // Set continuation flag to true
+
+				// Start background threads for reading from the serial port and writing to the log file
+				ThreadPool.QueueUserWorkItem(ReadSerialPort);
+				ThreadPool.QueueUserWorkItem(WriteToLog);
+				ThreadPool.QueueUserWorkItem(CheckConnection);
+
+
+				// Console output of important configuration settings
+				Console.WriteLine("----- Configuration Information -----");
+				Console.WriteLine($"Log File Path: {logFilePath}");
+				Console.WriteLine($"COM Port: {_config.SerialPort.PortName}");
+				Console.WriteLine($"Baud Rate: {_config.SerialPort.BaudRate}");
+				Console.WriteLine($"Color Scheme: {_config.Display.ColorScheme}");
+				Console.WriteLine($"Console Title: {_config.Display.ConsoleName}");
+				Console.WriteLine("--------------------------------------\n");
+
+				Console.WriteLine("Type QUIT to exit");
+
+				// Main loop to read user input and send to the serial port
+				while (_continue)
+				{
+					string message = Console.ReadLine();
+					if (string.IsNullOrEmpty(message))
+					{
+						continue;
+					}
+					else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
+					{
+						_continue = false; // Exit the loop if "QUIT" is entered
+					}
+					else
+					{
+						_serialPort.WriteLine(message); // Write the message to the serial port
+					}
+				}
+
+				_serialPort.Close();
+				_logFileResult.StreamWriter.Close();
 				Console.ResetColor();
 
 				// Set log file as read-only
@@ -288,53 +373,48 @@ namespace COM_Port_Logger
 			Console.WriteLine();
 		}
 
-		private static async Task ReadSerialPortAsync()
-        {
-            byte[] buffer = new byte[1024];
-            while (_continue)
-            {
-                try
-                {
-                    int bytesRead = await _serialPort.BaseStream.ReadAsync(buffer, 0, buffer.Length);
-                    if (bytesRead > 0)
-                    {
-                        string message = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                        Console.WriteLine(message);
-                        await _semaphore.WaitAsync();
-                        try
-                        {
-                            _logMessage = message;
-                        }
-                        finally
-                        {
-                            _semaphore.Release();
-                        }
-                    }
-                }
-                catch (TimeoutException)
-                {
-                    // Handle timeout exception (if needed)
-                }
-                catch (IOException ex)
-                {
-                    Console.WriteLine($"Error reading from serial port: {ex.Message}");
-                    _continue = false;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"An error occurred while reading from serial port: {ex.Message}");
-                }
-            }
-        } // End of ReadSerialPortAsync()
+		private static void ReadSerialPort(object state)
+		{
+			byte[] buffer = new byte[1024];
+			while (_continue)
+			{
+				try
+				{
+					int bytesRead = _serialPort.Read(buffer, 0, buffer.Length);
+					if (bytesRead > 0)
+					{
+						string message = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+						Console.WriteLine(message);
+
+						lock (_lock)
+						{
+							_logMessage = message;
+						}
+					}
+				}
+				catch (TimeoutException)
+				{
+					// Handle timeout exception
+				}
+				catch (IOException ex)
+				{
+					Console.WriteLine($"Error reading from serial port: {ex.Message}");
+					_continue = false;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"An error occurred while reading from serial port: {ex.Message}");
+				}
+			}
+		} // End of ReadSerialPort()
 
 
-		private static async Task WriteToLogAsync()
+		private static void WriteToLog(object state)
 		{
 			// Continuously write to the log file while the _continue flag is true
 			while (_continue)
 			{
-				await _semaphore.WaitAsync();
-				try
+				lock (_lock)
 				{
 					// If there is a log message to write
 					if (_logMessage != null)
@@ -345,103 +425,67 @@ namespace COM_Port_Logger
 							string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 
 							// Write the log message with timestamp to the file
-							await _logFile.WriteLineAsync($"{timestamp}: {_logMessage}");
+							_logFileResult.StreamWriter.WriteLine($"{timestamp}: {_logMessage}");
 
 							// Flush the stream to ensure the message is written
-							await _logFile.FlushAsync();
+							_logFileResult.StreamWriter.Flush();
 
 							// Clear the log message
 							_logMessage = null;
 						}
 						catch (IOException ex)
 						{
-							// Handle IO exceptions that may occur while writing to the log file
 							Console.WriteLine($"Error writing to log file: {ex.Message}");
-
-							// Stop the writing loop by setting the _continue flag to false
 							_continue = false;
 						}
 						catch (Exception ex)
 						{
-							// Handle any other exceptions that may occur
 							Console.WriteLine($"An error occurred while writing to log file: {ex.Message}");
 						}
 					}
 				}
-				finally
-				{
-					_semaphore.Release();
-				}
-			}
-		} // End of WriteToLogAsync()
 
-		private static async Task OpenSerialPortAsync()
-		{
-			try
-			{
-				// Check if the serial port is not already open
-				if (!_serialPort.IsOpen)
-				{
-					// Attempt to open the serial port
-					_serialPort.Open();
-				}
+				Thread.Sleep(100); // Add a small delay to prevent high CPU usage
 			}
-			catch (UnauthorizedAccessException ex)
-			{
-				// Handle access denied errors (e.g., when the port is in use by another application)
-				Console.WriteLine($"Access denied to the serial port: {ex.Message}");
-				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
-			}
-			catch (IOException ex)
-			{
-				// Handle IO exceptions that may occur while opening the serial port
-				Console.WriteLine($"IO error opening serial port: {ex.Message}");
-				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
-			}
-			catch (Exception ex)
-			{
-				// Handle any other exceptions that may occur
-				Console.WriteLine($"An error occurred while opening the serial port: {ex.Message}");
-				await Task.Delay(5000); // Wait for 5 seconds before attempting to reconnect
-			}
-		} // End of OpenSerialPortAsync()
+		} // End of WriteToLog()
 
-		private static async Task TryReconnectAsync()
+		private static void TryReconnect()
 		{
-			// Ensure only one reconnection attempt occurs at a time
 			if (!_reconnecting)
 			{
 				_reconnecting = true;
 				Console.WriteLine("Attempting to reconnect...");
 
-				// Continuously attempt to reconnect until successful
 				while (!_serialPort.IsOpen)
 				{
-					// Attempt to open the serial port asynchronously
-					await OpenSerialPortAsync();
+					try
+					{
+						_serialPort.Open();
+					}
+					catch (Exception ex)
+					{
+						Console.WriteLine($"Error reconnecting: {ex.Message}");
+						Thread.Sleep(5000); // Wait for 5 seconds before attempting to reconnect
+					}
 				}
 
 				Console.WriteLine("Reconnection successful.");
 				_reconnecting = false;
 			}
-		} // End of TryReconnectAsync()
+		} // End of TryReconnect()
 
-		private static async Task CheckConnectionAsync()
+		private static void CheckConnection(object state)
 		{
-			// Continuously check the connection status while the _continue flag is true
 			while (_continue)
 			{
-				// If the serial port is not open
 				if (!_serialPort.IsOpen)
 				{
-					// Attempt to reconnect
-					await TryReconnectAsync();
+					TryReconnect();
 				}
 
-				// Wait for 1 second before checking the connection status again
-				await Task.Delay(1000);
+				Thread.Sleep(1000); // Check the connection status every 1 second
 			}
-		} // End of CheckConnectionAsync()
+		} // End of CheckConnection()
 
 	} // End of PortLog class
 } // End of COM_Port_Logger namespace

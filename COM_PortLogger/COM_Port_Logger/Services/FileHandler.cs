@@ -4,9 +4,15 @@ using System.IO;
 
 namespace COM_Port_Logger.Services
 {
+	public class LogFileResult
+	{
+		public StreamWriter StreamWriter { get; set; }
+		public string FilePath { get; set; }
+	}
+
 	public static class FileHandler
 	{
-		public static StreamWriter CreateLogFile(string baseDirectory)
+		public static LogFileResult CreateLogFile(string baseDirectory, string filename)
 		{
 			// Get the current date and time
 			DateTime now = DateTime.Now;
@@ -22,13 +28,14 @@ namespace COM_Port_Logger.Services
 			Directory.CreateDirectory(directoryPath);
 
 			// Create the log file path
-			string filePath = Path.Combine(directoryPath, "log.txt");
+			string filePath = Path.Combine(directoryPath, filename);
 
 			// Create or open the log file with shared read access
 			FileStream fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
 			StreamWriter streamWriter = new StreamWriter(fileStream);
 
-			return streamWriter;
+			// Return both StreamWriter and the file path in a custom class
+			return new LogFileResult { StreamWriter = streamWriter, FilePath = filePath };
 		} // End of CreateLogFile()
 
 		public static List<string> SearchConfigFiles(string directoryPath)

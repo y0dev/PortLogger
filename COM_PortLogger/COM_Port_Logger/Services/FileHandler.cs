@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger.Services
 {
@@ -14,30 +15,85 @@ namespace COM_Port_Logger.Services
 	{
 		public static LogFileResult CreateLogFile(string baseDirectory, string filename)
 		{
-			// Get the current date and time
-			DateTime now = DateTime.Now;
+			try
+			{
+				// Validate inputs
+				if (string.IsNullOrWhiteSpace(baseDirectory))
+				{
+					throw new ValidationException("BaseDirectory", baseDirectory, "Base directory cannot be null or empty");
+				}
 
-			// Create the directory path based on the current date and time
-			string directoryPath = Path.Combine(baseDirectory,
-				now.ToString("yyyy"),
-				now.ToString("MM_MMM"),
-				now.ToString("MM_dd"));
+				if (string.IsNullOrWhiteSpace(filename))
+				{
+					throw new ValidationException("FileName", filename, "Filename cannot be null or empty");
+				}
 
-			// Ensure the directory exists
-			Directory.CreateDirectory(directoryPath);
+				// Get the current date and time
+				DateTime now = DateTime.Now;
 
-			// Remove the .txt extension from the filename
-			string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
+				// Create the directory path based on the current date and time
+				string directoryPath = Path.Combine(baseDirectory,
+					now.ToString("yyyy"),
+					now.ToString("MM_MMM"),
+					now.ToString("MM_dd"));
 
-			// Create the log file path
-			string filePath = Path.Combine(directoryPath, $"{now:HH_mm_ss}_{fileNameWithoutExtension}.txt");
+				// Ensure the directory exists
+				try
+				{
+					Directory.CreateDirectory(directoryPath);
+				}
+				catch (Exception ex)
+				{
+					throw new FileOperationException(directoryPath, "CreateDirectory", 
+						$"Failed to create directory: {ex.Message}", ex);
+				}
 
-			// Create or open the log file with shared read access
-			FileStream fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
-			StreamWriter streamWriter = new StreamWriter(fileStream);
+				// Remove the .txt extension from the filename
+				string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filename);
 
-			// Return both StreamWriter and the file path in a custom class
-			return new LogFileResult { StreamWriter = streamWriter, FilePath = filePath };
+				// Create the log file path
+				string filePath = Path.Combine(directoryPath, $"{now:HH_mm_ss}_{fileNameWithoutExtension}.txt");
+
+				// Create or open the log file with shared read access
+				FileStream fileStream;
+				try
+				{
+					fileStream = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+				}
+				catch (Exception ex)
+				{
+					throw new FileOperationException(filePath, "CreateFileStream", 
+						$"Failed to create file stream: {ex.Message}", ex);
+				}
+
+				StreamWriter streamWriter;
+				try
+				{
+					streamWriter = new StreamWriter(fileStream);
+				}
+				catch (Exception ex)
+				{
+					fileStream?.Dispose();
+					throw new FileOperationException(filePath, "CreateStreamWriter", 
+						$"Failed to create stream writer: {ex.Message}", ex);
+				}
+
+				// Return both StreamWriter and the file path in a custom class
+				return new LogFileResult { StreamWriter = streamWriter, FilePath = filePath };
+			}
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (FileOperationException)
+			{
+				throw; // Re-throw file operation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new FileOperationException(baseDirectory, "CreateLogFile", 
+					$"Unexpected error creating log file: {ex.Message}", ex);
+			}
 		} // End of CreateLogFile()
 
 		public static List<string> SearchConfigFiles(string directoryPath)
@@ -46,15 +102,36 @@ namespace COM_Port_Logger.Services
 
 			try
 			{
+				// Validate input
+				if (string.IsNullOrWhiteSpace(directoryPath))
+				{
+					throw new ValidationException("DirectoryPath", directoryPath, "Directory path cannot be null or empty");
+				}
+
+				if (!Directory.Exists(directoryPath))
+				{
+					throw new FileOperationException(directoryPath, "SearchConfigFiles", 
+						$"Directory does not exist: {directoryPath}");
+				}
+
 				// Search for all .ini files in the specified directory and its subdirectories
 				foreach (var file in Directory.EnumerateFiles(directoryPath, "*.ini", SearchOption.AllDirectories))
 				{
 					iniFiles.Add(file);
 				}
 			}
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (FileOperationException)
+			{
+				throw; // Re-throw file operation exceptions
+			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"Error searching for .ini files: {ex.Message}");
+				throw new FileOperationException(directoryPath, "SearchConfigFiles", 
+					$"Unexpected error searching for config files: {ex.Message}", ex);
 			}
 
 			return iniFiles;

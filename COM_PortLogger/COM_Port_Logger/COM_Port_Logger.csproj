@@ -75,7 +75,9 @@
   <ItemGroup>
     <Compile Include="ConfigurationSettings\ColorScheme.cs" />
     <Compile Include="ConfigurationSettings\ConfigSettings.cs" />
+    <Compile Include="Exceptions\COM_Port_Logger_Exceptions.cs" />
     <Compile Include="Services\ConsoleHandler.cs" />
+    <Compile Include="Services\ErrorHandler.cs" />
     <Compile Include="Services\FileHandler.cs" />
     <Compile Include="Services\InputValidator.cs" />
     <Compile Include="PortLog.cs" />

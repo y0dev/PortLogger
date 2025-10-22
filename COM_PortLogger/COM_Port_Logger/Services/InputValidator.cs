@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO.Ports;
 using System.Linq;
+using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger.Services
 {
@@ -8,94 +9,225 @@ namespace COM_Port_Logger.Services
 	{
 		public static string ValidatePortName(string portName)
 		{
-			// Validate port name input
-			if (!SerialPort.GetPortNames().Contains(portName))
+			try
 			{
-				foreach(string port in SerialPort.GetPortNames())
+				// Validate port name input
+				if (string.IsNullOrWhiteSpace(portName))
 				{
-					Console.WriteLine(port);
+					throw new ValidationException("PortName", portName, "Port name cannot be null or empty");
 				}
-				Console.WriteLine($"Invalid port name '{portName}'. Using default port COM1.");
-				return "COM1"; // Use default port if input is invalid
+
+				if (!SerialPort.GetPortNames().Contains(portName))
+				{
+					var availablePorts = string.Join(", ", SerialPort.GetPortNames());
+					throw new ValidationException("PortName", portName, 
+						$"Invalid port name '{portName}'. Available ports: {availablePorts}");
+				}
+				
+				return portName;
 			}
-			return portName;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("PortName", portName, 
+					$"Error validating port name: {ex.Message}", ex);
+			}
 		}
 
 		public static int ValidateBaudRate(int baudRate)
 		{
-			// Validate baud rate input
-			if (baudRate < 110 || baudRate > 256000)
+			try
 			{
-				Console.WriteLine($"Invalid baud rate '{baudRate}'. Using default rate 9600.");
-				return 9600; // Use default baud rate if input is out of range
+				// Validate baud rate input
+				if (baudRate < 110 || baudRate > 256000)
+				{
+					throw new ValidationException("BaudRate", baudRate, 
+						$"Invalid baud rate '{baudRate}'. Must be between 110 and 256000");
+				}
+				return baudRate;
 			}
-			return baudRate;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("BaudRate", baudRate, 
+					$"Error validating baud rate: {ex.Message}", ex);
+			}
 		}
 
 		public static Parity ValidateParity(string parity)
 		{
-			// Validate parity input
-			if (!Enum.TryParse(parity, out Parity parsedParity))
+			try
 			{
-				Console.WriteLine($"Invalid parity '{parity}'. Using default parity None.");
-				return Parity.None; // Use default parity if input is invalid
+				// Validate parity input
+				if (string.IsNullOrWhiteSpace(parity))
+				{
+					throw new ValidationException("Parity", parity, "Parity cannot be null or empty");
+				}
+
+				if (!Enum.TryParse(parity, true, out Parity parsedParity))
+				{
+					var validValues = string.Join(", ", Enum.GetNames(typeof(Parity)));
+					throw new ValidationException("Parity", parity, 
+						$"Invalid parity '{parity}'. Valid values: {validValues}");
+				}
+				return parsedParity;
 			}
-			return (Parity)parsedParity;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("Parity", parity, 
+					$"Error validating parity: {ex.Message}", ex);
+			}
 		}
 
 		public static int ValidateDataBits(int dataBits)
 		{
-			// Validate data bits input
-			if (dataBits < 5 || dataBits > 8)
+			try
 			{
-				Console.WriteLine($"Invalid data bits '{dataBits}'. Using default value 8.");
-				return 8; // Use default data bits if input is out of range
+				// Validate data bits input
+				if (dataBits < 5 || dataBits > 8)
+				{
+					throw new ValidationException("DataBits", dataBits, 
+						$"Invalid data bits '{dataBits}'. Must be between 5 and 8");
+				}
+				return dataBits;
 			}
-			return dataBits;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("DataBits", dataBits, 
+					$"Error validating data bits: {ex.Message}", ex);
+			}
 		}
 
 		public static StopBits ValidateStopBits(string stopBits)
 		{
-			// Validate stop bits input
-			if (!Enum.TryParse(stopBits, out StopBits parsedStopBits))
+			try
 			{
-				Console.WriteLine($"Invalid stop bits '{stopBits}'. Using default value One.");
-				return StopBits.One; // Use default stop bits if input is invalid
+				// Validate stop bits input
+				if (string.IsNullOrWhiteSpace(stopBits))
+				{
+					throw new ValidationException("StopBits", stopBits, "Stop bits cannot be null or empty");
+				}
+
+				if (!Enum.TryParse(stopBits, true, out StopBits parsedStopBits))
+				{
+					var validValues = string.Join(", ", Enum.GetNames(typeof(StopBits)));
+					throw new ValidationException("StopBits", stopBits, 
+						$"Invalid stop bits '{stopBits}'. Valid values: {validValues}");
+				}
+				return parsedStopBits;
 			}
-			return parsedStopBits;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("StopBits", stopBits, 
+					$"Error validating stop bits: {ex.Message}", ex);
+			}
 		}
 
 		public static Handshake ValidateHandshake(string handshake)
 		{
-			// Validate handshake input
-			if (!Enum.TryParse(handshake, out Handshake parsedHandshake))
+			try
 			{
-				Console.WriteLine($"Invalid handshake '{handshake}'. Using default value None.");
-				return Handshake.None; // Use default handshake if input is invalid
+				// Validate handshake input
+				if (string.IsNullOrWhiteSpace(handshake))
+				{
+					throw new ValidationException("Handshake", handshake, "Handshake cannot be null or empty");
+				}
+
+				if (!Enum.TryParse(handshake, true, out Handshake parsedHandshake))
+				{
+					var validValues = string.Join(", ", Enum.GetNames(typeof(Handshake)));
+					throw new ValidationException("Handshake", handshake, 
+						$"Invalid handshake '{handshake}'. Valid values: {validValues}");
+				}
+				return parsedHandshake;
 			}
-			return parsedHandshake;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("Handshake", handshake, 
+					$"Error validating handshake: {ex.Message}", ex);
+			}
 		}
 
 		public static string ValidateLogDirectory(string directory)
 		{
-			// Validate log directory input
-			if (string.IsNullOrWhiteSpace(directory))
+			try
 			{
-				Console.WriteLine("Invalid log directory. Using default directory 'logs'.");
-				return "logs"; // Use default directory if input is empty or null
+				// Validate log directory input
+				if (string.IsNullOrWhiteSpace(directory))
+				{
+					throw new ValidationException("LogDirectory", directory, "Log directory cannot be null or empty");
+				}
+
+				// Check for invalid path characters
+				if (directory.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+				{
+					throw new ValidationException("LogDirectory", directory, 
+						"Log directory contains invalid path characters");
+				}
+
+				return directory;
 			}
-			return directory;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("LogDirectory", directory, 
+					$"Error validating log directory: {ex.Message}", ex);
+			}
 		}
 
 		public static string ValidateLogFileName(string fileName)
 		{
-			// Validate log file name input
-			if (string.IsNullOrWhiteSpace(fileName))
+			try
 			{
-				Console.WriteLine("Invalid log file name. Using default name 'log.txt'.");
-				return "log.txt"; // Use default file name if input is empty or null
+				// Validate log file name input
+				if (string.IsNullOrWhiteSpace(fileName))
+				{
+					throw new ValidationException("LogFileName", fileName, "Log file name cannot be null or empty");
+				}
+
+				// Check for invalid filename characters
+				if (fileName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+				{
+					throw new ValidationException("LogFileName", fileName, 
+						"Log file name contains invalid filename characters");
+				}
+
+				return fileName;
 			}
-			return fileName;
+			catch (ValidationException)
+			{
+				throw; // Re-throw validation exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ValidationException("LogFileName", fileName, 
+					$"Error validating log file name: {ex.Message}", ex);
+			}
 		}
 	}
 }

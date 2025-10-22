@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using COM_Port_Logger.Services;
 using COM_Port_Logger.ConfigurationSettings;
+using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger
 {
@@ -25,13 +26,15 @@ namespace COM_Port_Logger
 		{
 			try
 			{
+				// Initialize error handler
+				ErrorHandler.Initialize("error_logs");
+
 				// Load configuration settings for the specified console name
 				_config = LoadConfig(consoleName);
 
 				if (_config == null)
 				{
-					Console.WriteLine($"No configuration found for console name: {consoleName}");
-					return;
+					throw new ConfigurationException("", "", $"No configuration found for console name: {consoleName}");
 				}
 
 				_colorScheme = ColorScheme.GetColorScheme(_config.Display.ColorScheme);
@@ -41,23 +44,52 @@ namespace COM_Port_Logger
 
 				// Initialize and configure the SerialPort
 				_serialPort = new SerialPort();
-				_serialPort.PortName = InputValidator.ValidatePortName(_config.SerialPort.PortName);
-				_serialPort.BaudRate = InputValidator.ValidateBaudRate(_config.SerialPort.BaudRate);
-				_serialPort.Parity = InputValidator.ValidateParity(_config.SerialPort.Parity);
-				_serialPort.DataBits = InputValidator.ValidateDataBits(_config.SerialPort.DataBits);
-				_serialPort.StopBits = InputValidator.ValidateStopBits(_config.SerialPort.StopBits);
-				_serialPort.Handshake = InputValidator.ValidateHandshake(_config.SerialPort.Handshake);
-				_serialPort.ReadTimeout = 500;
-				_serialPort.WriteTimeout = 500;
+				try
+				{
+					_serialPort.PortName = InputValidator.ValidatePortName(_config.SerialPort.PortName);
+					_serialPort.BaudRate = InputValidator.ValidateBaudRate(_config.SerialPort.BaudRate);
+					_serialPort.Parity = InputValidator.ValidateParity(_config.SerialPort.Parity);
+					_serialPort.DataBits = InputValidator.ValidateDataBits(_config.SerialPort.DataBits);
+					_serialPort.StopBits = InputValidator.ValidateStopBits(_config.SerialPort.StopBits);
+					_serialPort.Handshake = InputValidator.ValidateHandshake(_config.SerialPort.Handshake);
+					_serialPort.ReadTimeout = 500;
+					_serialPort.WriteTimeout = 500;
+				}
+				catch (ValidationException ex)
+				{
+					throw new SerialPortException(_config.SerialPort.PortName, _config.SerialPort.BaudRate, 
+						$"Serial port configuration validation failed: {ex.Message}", ex);
+				}
 
 				// Open the serial port
-				_serialPort.Open();
+				try
+				{
+					_serialPort.Open();
+					ErrorHandler.LogInfo($"Serial port {_serialPort.PortName} opened successfully", "Start");
+				}
+				catch (Exception ex)
+				{
+					throw new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
+						$"Failed to open serial port: {ex.Message}", ex);
+				}
 
 				// Open the log file
-				string logDirectory = InputValidator.ValidateLogDirectory(_config.LogFile.BaseDirectory);
-				string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
-				_logFileResult = FileHandler.CreateLogFile(logDirectory, logFileName);
-				string logFilePath = _logFileResult.FilePath;
+				try
+				{
+					string logDirectory = InputValidator.ValidateLogDirectory(_config.LogFile.BaseDirectory);
+					string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
+					_logFileResult = FileHandler.CreateLogFile(logDirectory, logFileName);
+					string logFilePath = _logFileResult.FilePath;
+					ErrorHandler.LogInfo($"Log file created: {logFilePath}", "Start");
+				}
+				catch (ValidationException ex)
+				{
+					throw new ConfigurationException("", "", $"Log file configuration validation failed: {ex.Message}", ex);
+				}
+				catch (FileOperationException ex)
+				{
+					throw new ConfigurationException("", "", $"Log file creation failed: {ex.Message}", ex);
+				}
 
 				_continue = true; // Set continuation flag to true
 
@@ -71,33 +103,44 @@ namespace COM_Port_Logger
 				// Main loop to read user input and send to the serial port
 				while (_continue)
 				{
-					string message = Console.ReadLine();
-					if (string.IsNullOrEmpty(message))
+					try
 					{
-						// Handle empty message
-						continue;
+						string message = Console.ReadLine();
+						if (string.IsNullOrEmpty(message))
+						{
+							// Handle empty message
+							continue;
+						}
+						else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
+						{
+							_continue = false; // Exit the loop if "QUIT" is entered
+						}
+						else
+						{
+							_serialPort.WriteLine(message); // Write the message to the serial port
+						}
 					}
-					else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
+					catch (Exception ex)
 					{
-						_continue = false; // Exit the loop if "QUIT" is entered
-					}
-					else
-					{
-						_serialPort.WriteLine(message); // Write the message to the serial port
+						ErrorHandler.HandleSerialPortException(
+							new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
+								$"Error sending message to serial port: {ex.Message}", ex), 
+							"User input processing");
 					}
 				}
 
-				_serialPort.Close();
-				_logFileResult.StreamWriter.Close();
-				Console.ResetColor();
-
-				// Set log file as read-only
-				File.SetAttributes(logFilePath, File.GetAttributes(logFilePath) | FileAttributes.ReadOnly);
+				// Cleanup
+				CleanupResources();
+			}
+			catch (COMPortLoggerException ex)
+			{
+				ErrorHandler.HandleCOMPortLoggerException(ex, "Start method");
+				throw; // Re-throw to allow caller to handle
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine($"An error occurred: {ex.Message}");
-				Console.ResetColor();
+				ErrorHandler.HandleException(ex, "Start method");
+				throw; // Re-throw to allow caller to handle
 			}
 		} // End of Start()
 
@@ -208,83 +251,116 @@ namespace COM_Port_Logger
 		private static ConfigSettings LoadConfig(string consoleName)
 		{
 			var configDirectory = "configs"; // Directory containing the configuration files
-			var configFiles = FileHandler.SearchConfigFiles(configDirectory);
-
-			foreach (var configFilePath in configFiles)
+			
+			try
 			{
-				var config = new ConfigSettings();
-				Console.WriteLine($"Configuration path: {configFilePath}");
-				try
+				var configFiles = FileHandler.SearchConfigFiles(configDirectory);
+
+				foreach (var configFilePath in configFiles)
 				{
-					var lines = File.ReadAllLines(configFilePath);
-					string currentSection = string.Empty;
-
-					foreach (var line in lines)
+					var config = new ConfigSettings();
+					ErrorHandler.LogInfo($"Loading configuration from: {configFilePath}", "LoadConfig");
+					
+					try
 					{
-						var trimmedLine = line.Trim();
-						if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith(";"))
-							continue;
+						var lines = File.ReadAllLines(configFilePath);
+						string currentSection = string.Empty;
 
-						if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
+						foreach (var line in lines)
 						{
-							currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
-						}
-						else
-						{
-							var keyValue = trimmedLine.Split('=');
-							if (keyValue.Length == 2)
+							var trimmedLine = line.Trim();
+							if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith(";"))
+								continue;
+
+							if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
 							{
-								var key = keyValue[0].Trim();
-								var value = keyValue[1].Trim();
-
-								switch (currentSection)
+								currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
+							}
+							else
+							{
+								var keyValue = trimmedLine.Split('=');
+								if (keyValue.Length == 2)
 								{
-									case "SerialPort":
-										SetSerialPortSetting(config.SerialPort, key, value);
-										break;
-									case "LogFile":
-										SetLogFileSetting(config.LogFile, key, value);
-										break;
-									case "Display":
-										SetDisplaySetting(config.Display, key, value);
-										break;
+									var key = keyValue[0].Trim();
+									var value = keyValue[1].Trim();
+
+									try
+									{
+										switch (currentSection)
+										{
+											case "SerialPort":
+												SetSerialPortSetting(config.SerialPort, key, value);
+												break;
+											case "LogFile":
+												SetLogFileSetting(config.LogFile, key, value);
+												break;
+											case "Display":
+												SetDisplaySetting(config.Display, key, value);
+												break;
+										}
+									}
+									catch (Exception ex)
+									{
+										throw new ConfigurationException(configFilePath, currentSection, 
+											$"Error setting {key}={value}: {ex.Message}", ex);
+									}
 								}
 							}
 						}
-					}
-					
-					if (config.Display.ConsoleName.Equals(consoleName, StringComparison.OrdinalIgnoreCase))
-					{
-						if (ValidateCOMPort(config.SerialPort.PortName))
+						
+						if (config.Display.ConsoleName.Equals(consoleName, StringComparison.OrdinalIgnoreCase))
 						{
-							return config;
+							if (ValidateCOMPort(config.SerialPort.PortName))
+							{
+								ErrorHandler.LogInfo($"Configuration loaded successfully for console: {consoleName}", "LoadConfig");
+								return config;
+							}
+							else
+							{
+								throw new ConfigurationException(configFilePath, "SerialPort", 
+									$"COM port {config.SerialPort.PortName} is not available");
+							}
 						}
 					}
+					catch (ConfigurationException)
+					{
+						throw; // Re-throw configuration exceptions
+					}
+					catch (Exception ex)
+					{
+						throw new ConfigurationException(configFilePath, "", 
+							$"Error loading config file: {ex.Message}", ex);
+					}
 				}
-				catch (Exception ex)
-				{
-					Console.WriteLine($"Error loading config file: {ex.Message}");
-				}
-			}
 
-			return null;
-			
+				throw new ConfigurationException("", "", $"No configuration found for console name: {consoleName}");
+			}
+			catch (ConfigurationException)
+			{
+				throw; // Re-throw configuration exceptions
+			}
+			catch (Exception ex)
+			{
+				throw new ConfigurationException(configDirectory, "", 
+					$"Error loading configuration: {ex.Message}", ex);
+			}
 		} // End of LoadConfig()
 
 		private static bool ValidateCOMPort(string portName)
 		{
 			try
 			{
-
-				Console.WriteLine($"Checking if we can connect to port {portName}");
+				ErrorHandler.LogInfo($"Checking if we can connect to port {portName}", "ValidateCOMPort");
 				using (var tempSerialPort = new SerialPort(portName))
 				{
 					tempSerialPort.Open();
+					ErrorHandler.LogInfo($"Port {portName} is available", "ValidateCOMPort");
 					return true; // COM port can be opened
 				}
 			}
-			catch
+			catch (Exception ex)
 			{
+				ErrorHandler.LogWarning($"Port {portName} is not available: {ex.Message}", "ValidateCOMPort");
 				return false; // COM port cannot be opened
 			}
 		} // End of ValidateCOMPort()
@@ -393,16 +469,32 @@ namespace COM_Port_Logger
 				}
 				catch (TimeoutException)
 				{
-					// Handle timeout exception
+					// Handle timeout exception - this is normal behavior
+					continue;
 				}
 				catch (IOException ex)
 				{
-					Console.WriteLine($"Error reading from serial port: {ex.Message}");
+					ErrorHandler.HandleSerialPortException(
+						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
+							$"IO error reading from serial port: {ex.Message}", ex), 
+						"ReadSerialPort");
+					_continue = false;
+				}
+				catch (InvalidOperationException ex)
+				{
+					ErrorHandler.HandleSerialPortException(
+						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
+							$"Serial port is not open: {ex.Message}", ex), 
+						"ReadSerialPort");
 					_continue = false;
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine($"An error occurred while reading from serial port: {ex.Message}");
+					ErrorHandler.HandleSerialPortException(
+						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
+							$"Unexpected error reading from serial port: {ex.Message}", ex), 
+						"ReadSerialPort");
+					_continue = false;
 				}
 			}
 		} // End of ReadSerialPort()
@@ -434,12 +526,27 @@ namespace COM_Port_Logger
 						}
 						catch (IOException ex)
 						{
-							Console.WriteLine($"Error writing to log file: {ex.Message}");
+							ErrorHandler.HandleFileOperationException(
+								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
+									$"IO error writing to log file: {ex.Message}", ex), 
+								"WriteToLog");
+							_continue = false;
+						}
+						catch (ObjectDisposedException ex)
+						{
+							ErrorHandler.HandleFileOperationException(
+								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
+									$"Log file stream has been disposed: {ex.Message}", ex), 
+								"WriteToLog");
 							_continue = false;
 						}
 						catch (Exception ex)
 						{
-							Console.WriteLine($"An error occurred while writing to log file: {ex.Message}");
+							ErrorHandler.HandleFileOperationException(
+								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
+									$"Unexpected error writing to log file: {ex.Message}", ex), 
+								"WriteToLog");
+							_continue = false;
 						}
 					}
 				}
@@ -453,22 +560,43 @@ namespace COM_Port_Logger
 			if (!_reconnecting)
 			{
 				_reconnecting = true;
-				Console.WriteLine("Attempting to reconnect...");
+				ErrorHandler.LogWarning("Attempting to reconnect to serial port", "TryReconnect");
 
-				while (!_serialPort.IsOpen)
+				int retryCount = 0;
+				const int maxRetries = 5;
+				const int retryDelay = 5000; // 5 seconds
+
+				while (!_serialPort.IsOpen && retryCount < maxRetries)
 				{
 					try
 					{
+						retryCount++;
+						ErrorHandler.LogInfo($"Reconnection attempt {retryCount}/{maxRetries}", "TryReconnect");
+						
 						_serialPort.Open();
+						ErrorHandler.LogInfo("Reconnection successful", "TryReconnect");
+						break;
 					}
 					catch (Exception ex)
 					{
-						Console.WriteLine($"Error reconnecting: {ex.Message}");
-						Thread.Sleep(5000); // Wait for 5 seconds before attempting to reconnect
+						ErrorHandler.HandleConnectionException(
+							new ConnectionException("SerialPort", retryCount, 
+								$"Reconnection attempt {retryCount} failed: {ex.Message}", ex), 
+							"TryReconnect");
+						
+						if (retryCount < maxRetries)
+						{
+							ErrorHandler.LogInfo($"Waiting {retryDelay/1000} seconds before next retry", "TryReconnect");
+							Thread.Sleep(retryDelay);
+						}
 					}
 				}
 
-				Console.WriteLine("Reconnection successful.");
+				if (retryCount >= maxRetries)
+				{
+					ErrorHandler.LogWarning($"Failed to reconnect after {maxRetries} attempts", "TryReconnect");
+				}
+
 				_reconnecting = false;
 			}
 		} // End of TryReconnect()
@@ -477,14 +605,66 @@ namespace COM_Port_Logger
 		{
 			while (_continue)
 			{
-				if (!_serialPort.IsOpen)
+				try
 				{
-					TryReconnect();
+					if (!_serialPort.IsOpen)
+					{
+						ErrorHandler.LogWarning("Serial port connection lost", "CheckConnection");
+						TryReconnect();
+					}
+				}
+				catch (Exception ex)
+				{
+					ErrorHandler.HandleConnectionException(
+						new ConnectionException("SerialPort", 0, 
+							$"Error checking connection: {ex.Message}", ex), 
+						"CheckConnection");
 				}
 
 				Thread.Sleep(1000); // Check the connection status every 1 second
 			}
 		} // End of CheckConnection()
+
+		private static void CleanupResources()
+		{
+			try
+			{
+				// Close serial port
+				if (_serialPort != null && _serialPort.IsOpen)
+				{
+					_serialPort.Close();
+					ErrorHandler.LogInfo("Serial port closed successfully", "CleanupResources");
+				}
+
+				// Close log file
+				if (_logFileResult?.StreamWriter != null)
+				{
+					_logFileResult.StreamWriter.Close();
+					ErrorHandler.LogInfo("Log file closed successfully", "CleanupResources");
+
+					// Set log file as read-only
+					try
+					{
+						if (!string.IsNullOrEmpty(_logFileResult.FilePath) && File.Exists(_logFileResult.FilePath))
+						{
+							File.SetAttributes(_logFileResult.FilePath, File.GetAttributes(_logFileResult.FilePath) | FileAttributes.ReadOnly);
+							ErrorHandler.LogInfo($"Log file set as read-only: {_logFileResult.FilePath}", "CleanupResources");
+						}
+					}
+					catch (Exception ex)
+					{
+						ErrorHandler.LogWarning($"Failed to set log file as read-only: {ex.Message}", "CleanupResources");
+					}
+				}
+
+				// Reset console colors
+				Console.ResetColor();
+			}
+			catch (Exception ex)
+			{
+				ErrorHandler.HandleException(ex, "CleanupResources", false);
+			}
+		}
 
 	} // End of PortLog class
 } // End of COM_Port_Logger namespace

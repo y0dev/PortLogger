@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger
 {
@@ -39,8 +40,7 @@ namespace COM_Port_Logger
 					// Parse baudRate argument to an integer
 					if (!int.TryParse(args[3], out baudRate))
 					{
-						Console.WriteLine("Invalid baud rate. Please provide a valid integer value.");
-						return;
+						throw new ValidationException("BaudRate", args[3], "Invalid baud rate. Please provide a valid integer value.");
 					}
 
 					string colorSchemeName = args[4];
@@ -53,13 +53,27 @@ namespace COM_Port_Logger
 				else
 				{
 					// Invalid number of arguments provided
-					Console.WriteLine("Invalid number of arguments. Please provide:");
-					Console.WriteLine("Usage: <consoleName> OR <baseDirectory> <logFileName> <comPort> <baudRate> <colorSchemeName> <consoleTitle>");
+					throw new ValidationException("Arguments", args.Length.ToString(), 
+						"Invalid number of arguments. Please provide either 1 or 6 arguments.");
 				}
+			}
+			catch (COMPortLoggerException ex)
+			{
+				// Handle COM Port Logger specific exceptions
+				Console.ForegroundColor = ConsoleColor.Red;
+				Console.WriteLine($"ERROR [{ex.ErrorCode}]: {ex.Message}");
+				Console.WriteLine($"Timestamp: {ex.Timestamp:yyyy-MM-dd HH:mm:ss.fff}");
+				Console.ResetColor();
+				Environment.Exit(1);
 			}
 			catch (Exception ex)
 			{
+				// Handle unexpected exceptions
+				Console.ForegroundColor = ConsoleColor.Red;
 				Console.WriteLine($"Unexpected error: {ex.Message}");
+				Console.WriteLine($"Stack trace: {ex.StackTrace}");
+				Console.ResetColor();
+				Environment.Exit(1);
 			}
 		}
 	}

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using COM_Port_Logger.Services;
 using COM_Port_Logger.ConfigurationSettings;
 using COM_Port_Logger.Exceptions;
+using COM_Port_Logger.Logging;
 
 namespace COM_Port_Logger
 {
@@ -26,8 +27,12 @@ namespace COM_Port_Logger
 		{
 			try
 			{
+				// Initialize logging system
+				Log.Initialize(LoggingConfigurationHelper.CreateDefaultConfiguration());
+				Log.Info($"Starting COM Port Logger with console name: {consoleName}", "PortLog");
+
 				// Initialize error handler
-				ErrorHandler.Initialize("error_logs");
+				ErrorHandler.Initialize();
 
 				// Load configuration settings for the specified console name
 				_config = LoadConfig(consoleName);
@@ -65,7 +70,7 @@ namespace COM_Port_Logger
 				try
 				{
 					_serialPort.Open();
-					ErrorHandler.LogInfo($"Serial port {_serialPort.PortName} opened successfully", "Start");
+					StructuredLogging.LogSerialPortOperation("Open", _serialPort.PortName, _serialPort.BaudRate, true, "Serial port opened successfully");
 				}
 				catch (Exception ex)
 				{
@@ -80,7 +85,7 @@ namespace COM_Port_Logger
 					string logFileName = InputValidator.ValidateLogFileName(_config.LogFile.FileName);
 					_logFileResult = FileHandler.CreateLogFile(logDirectory, logFileName);
 					string logFilePath = _logFileResult.FilePath;
-					ErrorHandler.LogInfo($"Log file created: {logFilePath}", "Start");
+					StructuredLogging.LogFileOperation("Create", logFilePath, true, null, "Log file created successfully");
 				}
 				catch (ValidationException ex)
 				{
@@ -98,6 +103,7 @@ namespace COM_Port_Logger
 				ThreadPool.QueueUserWorkItem(WriteToLog);
 				ThreadPool.QueueUserWorkItem(CheckConnection);
 				
+				Log.Info("COM Port Logger started successfully", "PortLog");
 				Console.WriteLine("Type QUIT to exit");
 
 				// Main loop to read user input and send to the serial port
@@ -118,6 +124,7 @@ namespace COM_Port_Logger
 						else
 						{
 							_serialPort.WriteLine(message); // Write the message to the serial port
+							Log.Debug($"Sent message to serial port: {message}", "PortLog");
 						}
 					}
 					catch (Exception ex)
@@ -259,7 +266,7 @@ namespace COM_Port_Logger
 				foreach (var configFilePath in configFiles)
 				{
 					var config = new ConfigSettings();
-					ErrorHandler.LogInfo($"Loading configuration from: {configFilePath}", "LoadConfig");
+					Log.Debug($"Loading configuration from: {configFilePath}", "LoadConfig");
 					
 					try
 					{
@@ -312,7 +319,7 @@ namespace COM_Port_Logger
 						{
 							if (ValidateCOMPort(config.SerialPort.PortName))
 							{
-								ErrorHandler.LogInfo($"Configuration loaded successfully for console: {consoleName}", "LoadConfig");
+								StructuredLogging.LogConfigurationLoad(configFilePath, true, $"Configuration loaded successfully for console: {consoleName}");
 								return config;
 							}
 							else
@@ -350,17 +357,17 @@ namespace COM_Port_Logger
 		{
 			try
 			{
-				ErrorHandler.LogInfo($"Checking if we can connect to port {portName}", "ValidateCOMPort");
+				Log.Debug($"Checking if we can connect to port {portName}", "ValidateCOMPort");
 				using (var tempSerialPort = new SerialPort(portName))
 				{
 					tempSerialPort.Open();
-					ErrorHandler.LogInfo($"Port {portName} is available", "ValidateCOMPort");
+					Log.Debug($"Port {portName} is available", "ValidateCOMPort");
 					return true; // COM port can be opened
 				}
 			}
 			catch (Exception ex)
 			{
-				ErrorHandler.LogWarning($"Port {portName} is not available: {ex.Message}", "ValidateCOMPort");
+				Log.Warning($"Port {portName} is not available: {ex.Message}", "ValidateCOMPort", "PortLog", ex);
 				return false; // COM port cannot be opened
 			}
 		} // End of ValidateCOMPort()
@@ -560,7 +567,7 @@ namespace COM_Port_Logger
 			if (!_reconnecting)
 			{
 				_reconnecting = true;
-				ErrorHandler.LogWarning("Attempting to reconnect to serial port", "TryReconnect");
+				StructuredLogging.LogConnectionEvent("reconnecting", "SerialPort", 0, "Attempting to reconnect to serial port");
 
 				int retryCount = 0;
 				const int maxRetries = 5;
@@ -571,22 +578,20 @@ namespace COM_Port_Logger
 					try
 					{
 						retryCount++;
-						ErrorHandler.LogInfo($"Reconnection attempt {retryCount}/{maxRetries}", "TryReconnect");
+						Log.Debug($"Reconnection attempt {retryCount}/{maxRetries}", "TryReconnect");
 						
 						_serialPort.Open();
-						ErrorHandler.LogInfo("Reconnection successful", "TryReconnect");
+						StructuredLogging.LogConnectionEvent("connected", "SerialPort", retryCount, "Reconnection successful");
 						break;
 					}
 					catch (Exception ex)
 					{
-						ErrorHandler.HandleConnectionException(
-							new ConnectionException("SerialPort", retryCount, 
-								$"Reconnection attempt {retryCount} failed: {ex.Message}", ex), 
-							"TryReconnect");
+						StructuredLogging.LogConnectionEvent("reconnect_failed", "SerialPort", retryCount, 
+							$"Reconnection attempt {retryCount} failed: {ex.Message}", ex);
 						
 						if (retryCount < maxRetries)
 						{
-							ErrorHandler.LogInfo($"Waiting {retryDelay/1000} seconds before next retry", "TryReconnect");
+							Log.Debug($"Waiting {retryDelay/1000} seconds before next retry", "TryReconnect");
 							Thread.Sleep(retryDelay);
 						}
 					}
@@ -594,7 +599,7 @@ namespace COM_Port_Logger
 
 				if (retryCount >= maxRetries)
 				{
-					ErrorHandler.LogWarning($"Failed to reconnect after {maxRetries} attempts", "TryReconnect");
+					Log.Warning($"Failed to reconnect after {maxRetries} attempts", "TryReconnect");
 				}
 
 				_reconnecting = false;
@@ -609,7 +614,7 @@ namespace COM_Port_Logger
 				{
 					if (!_serialPort.IsOpen)
 					{
-						ErrorHandler.LogWarning("Serial port connection lost", "CheckConnection");
+						StructuredLogging.LogConnectionEvent("disconnected", "SerialPort", 0, "Serial port connection lost");
 						TryReconnect();
 					}
 				}
@@ -629,18 +634,20 @@ namespace COM_Port_Logger
 		{
 			try
 			{
+				Log.Info("Starting cleanup of resources", "CleanupResources");
+
 				// Close serial port
 				if (_serialPort != null && _serialPort.IsOpen)
 				{
 					_serialPort.Close();
-					ErrorHandler.LogInfo("Serial port closed successfully", "CleanupResources");
+					StructuredLogging.LogSerialPortOperation("Close", _serialPort.PortName, _serialPort.BaudRate, true, "Serial port closed successfully");
 				}
 
 				// Close log file
 				if (_logFileResult?.StreamWriter != null)
 				{
 					_logFileResult.StreamWriter.Close();
-					ErrorHandler.LogInfo("Log file closed successfully", "CleanupResources");
+					StructuredLogging.LogFileOperation("Close", _logFileResult.FilePath, true, null, "Log file closed successfully");
 
 					// Set log file as read-only
 					try
@@ -648,21 +655,28 @@ namespace COM_Port_Logger
 						if (!string.IsNullOrEmpty(_logFileResult.FilePath) && File.Exists(_logFileResult.FilePath))
 						{
 							File.SetAttributes(_logFileResult.FilePath, File.GetAttributes(_logFileResult.FilePath) | FileAttributes.ReadOnly);
-							ErrorHandler.LogInfo($"Log file set as read-only: {_logFileResult.FilePath}", "CleanupResources");
+							Log.Debug($"Log file set as read-only: {_logFileResult.FilePath}", "CleanupResources");
 						}
 					}
 					catch (Exception ex)
 					{
-						ErrorHandler.LogWarning($"Failed to set log file as read-only: {ex.Message}", "CleanupResources");
+						Log.Warning($"Failed to set log file as read-only: {ex.Message}", "CleanupResources", "PortLog", ex);
 					}
 				}
 
 				// Reset console colors
 				Console.ResetColor();
+
+				Log.Info("Cleanup completed successfully", "CleanupResources");
 			}
 			catch (Exception ex)
 			{
 				ErrorHandler.HandleException(ex, "CleanupResources", false);
+			}
+			finally
+			{
+				// Dispose logging system
+				Log.Dispose();
 			}
 		}
 

@@ -76,6 +76,8 @@
     <Compile Include="ConfigurationSettings\ColorScheme.cs" />
     <Compile Include="ConfigurationSettings\ConfigSettings.cs" />
     <Compile Include="Exceptions\COM_Port_Logger_Exceptions.cs" />
+    <Compile Include="Logging\Logger.cs" />
+    <Compile Include="Logging\LoggingConfiguration.cs" />
     <Compile Include="Services\ConsoleHandler.cs" />
     <Compile Include="Services\ErrorHandler.cs" />
     <Compile Include="Services\FileHandler.cs" />

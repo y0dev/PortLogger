@@ -21,18 +21,29 @@ namespace COM_Port_Logger
 		static bool _reconnecting; // Flag to prevent multiple reconnection attempts simultaneously
 		static ConfigSettings _config; // Configuration settings
 		static ColorScheme _colorScheme; // Color scheme for console
+		
+		// Performance optimization components
+		static BufferManager _bufferManager;
+		static OptimizedSerialPortReader _serialPortReader;
+		static OptimizedFileWriter _fileWriter;
 
 
 		public static void Start(string consoleName)
 		{
 			try
 			{
+				// Initialize performance monitoring
+				PerformanceOptimizer.Initialize();
+				
 				// Initialize logging system
 				Log.Initialize(LoggingConfigurationHelper.CreateDefaultConfiguration());
 				Log.Info($"Starting COM Port Logger with console name: {consoleName}", "PortLog");
 
 				// Initialize error handler
 				ErrorHandler.Initialize();
+
+				// Initialize buffer manager for performance optimization
+				_bufferManager = new BufferManager();
 
 				// Load configuration settings for the specified console name
 				_config = LoadConfig(consoleName);

@@ -7,24 +7,39 @@ namespace COM_Port_Logger.Services
 {
 	public static class InputValidator
 	{
+		/// <summary>
+		/// Validate and sanitize port name with security checks
+		/// </summary>
 		public static string ValidatePortName(string portName)
 		{
 			try
 			{
+				// Initialize security service
+				SecurityService.Initialize();
+
 				// Validate port name input
 				if (string.IsNullOrWhiteSpace(portName))
 				{
 					throw new ValidationException("PortName", portName, "Port name cannot be null or empty");
 				}
 
-				if (!SerialPort.GetPortNames().Contains(portName))
+				// Security sanitization
+				var sanitizedPortName = SecurityService.SanitizePortName(portName);
+
+				// Additional validation
+				if (!SerialPort.GetPortNames().Contains(sanitizedPortName))
 				{
 					var availablePorts = string.Join(", ", SerialPort.GetPortNames());
-					throw new ValidationException("PortName", portName, 
-						$"Invalid port name '{portName}'. Available ports: {availablePorts}");
+					throw new ValidationException("PortName", sanitizedPortName, 
+						$"Invalid port name '{sanitizedPortName}'. Available ports: {availablePorts}");
 				}
 				
-				return portName;
+				return sanitizedPortName;
+			}
+			catch (SecurityException ex)
+			{
+				throw new ValidationException("PortName", portName, 
+					$"Security validation failed: {ex.Message}", ex);
 			}
 			catch (ValidationException)
 			{
@@ -37,17 +52,31 @@ namespace COM_Port_Logger.Services
 			}
 		}
 
+		/// <summary>
+		/// Validate and sanitize baud rate with security checks
+		/// </summary>
 		public static int ValidateBaudRate(int baudRate)
 		{
 			try
 			{
-				// Validate baud rate input
-				if (baudRate < 110 || baudRate > 256000)
+				// Initialize security service
+				SecurityService.Initialize();
+
+				// Security sanitization
+				var sanitizedBaudRate = SecurityService.SanitizeBaudRate(baudRate);
+
+				// Additional validation
+				if (sanitizedBaudRate < 110 || sanitizedBaudRate > 256000)
 				{
-					throw new ValidationException("BaudRate", baudRate, 
-						$"Invalid baud rate '{baudRate}'. Must be between 110 and 256000");
+					throw new ValidationException("BaudRate", sanitizedBaudRate, 
+						$"Invalid baud rate '{sanitizedBaudRate}'. Must be between 110 and 256000");
 				}
-				return baudRate;
+				return sanitizedBaudRate;
+			}
+			catch (SecurityException ex)
+			{
+				throw new ValidationException("BaudRate", baudRate, 
+					$"Security validation failed: {ex.Message}", ex);
 			}
 			catch (ValidationException)
 			{
@@ -170,24 +199,38 @@ namespace COM_Port_Logger.Services
 			}
 		}
 
+		/// <summary>
+		/// Validate and sanitize log directory with security checks
+		/// </summary>
 		public static string ValidateLogDirectory(string directory)
 		{
 			try
 			{
+				// Initialize security service
+				SecurityService.Initialize();
+
 				// Validate log directory input
 				if (string.IsNullOrWhiteSpace(directory))
 				{
 					throw new ValidationException("LogDirectory", directory, "Log directory cannot be null or empty");
 				}
 
-				// Check for invalid path characters
-				if (directory.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+				// Security sanitization
+				var sanitizedDirectory = SecurityService.SanitizeFilePath(directory);
+
+				// Additional validation
+				if (sanitizedDirectory.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
 				{
-					throw new ValidationException("LogDirectory", directory, 
+					throw new ValidationException("LogDirectory", sanitizedDirectory, 
 						"Log directory contains invalid path characters");
 				}
 
-				return directory;
+				return sanitizedDirectory;
+			}
+			catch (SecurityException ex)
+			{
+				throw new ValidationException("LogDirectory", directory, 
+					$"Security validation failed: {ex.Message}", ex);
 			}
 			catch (ValidationException)
 			{
@@ -200,24 +243,38 @@ namespace COM_Port_Logger.Services
 			}
 		}
 
+		/// <summary>
+		/// Validate and sanitize log file name with security checks
+		/// </summary>
 		public static string ValidateLogFileName(string fileName)
 		{
 			try
 			{
+				// Initialize security service
+				SecurityService.Initialize();
+
 				// Validate log file name input
 				if (string.IsNullOrWhiteSpace(fileName))
 				{
 					throw new ValidationException("LogFileName", fileName, "Log file name cannot be null or empty");
 				}
 
-				// Check for invalid filename characters
-				if (fileName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+				// Security sanitization
+				var sanitizedFileName = SecurityService.SanitizeFileName(fileName);
+
+				// Additional validation
+				if (sanitizedFileName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
 				{
-					throw new ValidationException("LogFileName", fileName, 
+					throw new ValidationException("LogFileName", sanitizedFileName, 
 						"Log file name contains invalid filename characters");
 				}
 
-				return fileName;
+				return sanitizedFileName;
+			}
+			catch (SecurityException ex)
+			{
+				throw new ValidationException("LogFileName", fileName, 
+					$"Security validation failed: {ex.Message}", ex);
 			}
 			catch (ValidationException)
 			{

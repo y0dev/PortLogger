@@ -5,11 +5,20 @@ using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger.Services
 {
+	/// <summary>
+	/// Provides input validation and sanitization for serial port configuration parameters.
+	/// Ensures all inputs are secure, valid, and within acceptable ranges.
+	/// </summary>
 	public static class InputValidator
 	{
 		/// <summary>
-		/// Validate and sanitize port name with security checks
+		/// Validates and sanitizes port name with security checks.
+		/// Ensures the port name exists and is available on the system.
 		/// </summary>
+		/// <param name="portName">The port name to validate (e.g., "COM1", "COM3").</param>
+		/// <returns>The sanitized and validated port name.</returns>
+		/// <exception cref="ValidationException">Thrown when port name is invalid or not available.</exception>
+		/// <exception cref="SecurityException">Thrown when security validation fails.</exception>
 		public static string ValidatePortName(string portName)
 		{
 			try
@@ -53,8 +62,13 @@ namespace COM_Port_Logger.Services
 		}
 
 		/// <summary>
-		/// Validate and sanitize baud rate with security checks
+		/// Validates and sanitizes baud rate with security checks.
+		/// Ensures the baud rate is within acceptable range (110-256000).
 		/// </summary>
+		/// <param name="baudRate">The baud rate to validate.</param>
+		/// <returns>The sanitized and validated baud rate.</returns>
+		/// <exception cref="ValidationException">Thrown when baud rate is outside valid range.</exception>
+		/// <exception cref="SecurityException">Thrown when security validation fails.</exception>
 		public static int ValidateBaudRate(int baudRate)
 		{
 			try
@@ -89,6 +103,13 @@ namespace COM_Port_Logger.Services
 			}
 		}
 
+		/// <summary>
+		/// Validates parity setting for serial communication.
+		/// Ensures the parity value is a valid enum value.
+		/// </summary>
+		/// <param name="parity">The parity setting to validate (e.g., "None", "Odd", "Even").</param>
+		/// <returns>The validated Parity enum value.</returns>
+		/// <exception cref="ValidationException">Thrown when parity value is invalid.</exception>
 		public static Parity ValidateParity(string parity)
 		{
 			try
@@ -118,6 +139,13 @@ namespace COM_Port_Logger.Services
 			}
 		}
 
+		/// <summary>
+		/// Validates data bits setting for serial communication.
+		/// Ensures the data bits value is within acceptable range (5-8).
+		/// </summary>
+		/// <param name="dataBits">The number of data bits to validate.</param>
+		/// <returns>The validated data bits value.</returns>
+		/// <exception cref="ValidationException">Thrown when data bits value is outside valid range.</exception>
 		public static int ValidateDataBits(int dataBits)
 		{
 			try

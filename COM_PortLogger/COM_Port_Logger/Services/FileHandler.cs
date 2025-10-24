@@ -5,14 +5,38 @@ using COM_Port_Logger.Exceptions;
 
 namespace COM_Port_Logger.Services
 {
+	/// <summary>
+	/// Represents the result of a log file creation operation.
+	/// Contains the StreamWriter and file path for the created log file.
+	/// </summary>
 	public class LogFileResult
 	{
+		/// <summary>
+		/// Gets or sets the StreamWriter for writing to the log file.
+		/// </summary>
 		public StreamWriter StreamWriter { get; set; }
+		
+		/// <summary>
+		/// Gets or sets the full path to the created log file.
+		/// </summary>
 		public string FilePath { get; set; }
 	}
 
+	/// <summary>
+	/// Handles file operations for log file creation and management.
+	/// Provides methods for creating organized log file structures with date-based directories.
+	/// </summary>
 	public static class FileHandler
 	{
+		/// <summary>
+		/// Creates a log file with organized directory structure based on current date.
+		/// Creates directories in the format: baseDirectory/yyyy/MM_MMM/MM_dd/
+		/// </summary>
+		/// <param name="baseDirectory">The base directory where log files should be stored.</param>
+		/// <param name="filename">The name of the log file to create.</param>
+		/// <returns>A LogFileResult containing the StreamWriter and file path.</returns>
+		/// <exception cref="ValidationException">Thrown when baseDirectory or filename is invalid.</exception>
+		/// <exception cref="FileOperationException">Thrown when file creation fails.</exception>
 		public static LogFileResult CreateLogFile(string baseDirectory, string filename)
 		{
 			try
@@ -96,6 +120,13 @@ namespace COM_Port_Logger.Services
 			}
 		} // End of CreateLogFile()
 
+		/// <summary>
+		/// Searches for configuration files (.ini) in the specified directory and all subdirectories.
+		/// </summary>
+		/// <param name="directoryPath">The directory path to search for configuration files.</param>
+		/// <returns>A list of full paths to all found .ini files.</returns>
+		/// <exception cref="ValidationException">Thrown when directoryPath is null or empty.</exception>
+		/// <exception cref="FileOperationException">Thrown when the directory doesn't exist or search fails.</exception>
 		public static List<string> SearchConfigFiles(string directoryPath)
 		{
 			var iniFiles = new List<string>();

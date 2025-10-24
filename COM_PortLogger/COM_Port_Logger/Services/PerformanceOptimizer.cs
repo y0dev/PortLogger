@@ -13,7 +13,8 @@ using COM_Port_Logger.Logging;
 namespace COM_Port_Logger.Services
 {
     /// <summary>
-    /// Performance monitoring and optimization service
+    /// Performance monitoring and optimization service for COM Port Logger.
+    /// Provides performance counters, memory monitoring, and optimization recommendations.
     /// </summary>
     public static class PerformanceOptimizer
     {
@@ -25,18 +26,51 @@ namespace COM_Port_Logger.Services
         private static readonly int _maxMemoryHistorySize = 100;
 
         /// <summary>
-        /// Performance counter for tracking operations
+        /// Performance counter for tracking operation metrics.
+        /// Records timing, frequency, and performance statistics for various operations.
         /// </summary>
         public class PerformanceCounter
         {
+            /// <summary>
+            /// Gets or sets the name of the performance counter.
+            /// </summary>
             public string Name { get; set; }
+            
+            /// <summary>
+            /// Gets or sets the total number of operations recorded.
+            /// </summary>
             public long TotalOperations { get; set; }
+            
+            /// <summary>
+            /// Gets or sets the total duration of all operations in milliseconds.
+            /// </summary>
             public long TotalDurationMs { get; set; }
+            
+            /// <summary>
+            /// Gets or sets the minimum operation duration in milliseconds.
+            /// </summary>
             public long MinDurationMs { get; set; } = long.MaxValue;
+            
+            /// <summary>
+            /// Gets or sets the maximum operation duration in milliseconds.
+            /// </summary>
             public long MaxDurationMs { get; set; }
+            
+            /// <summary>
+            /// Gets or sets the timestamp of the last operation.
+            /// </summary>
             public DateTime LastOperation { get; set; }
+            
+            /// <summary>
+            /// Gets the average duration of operations in milliseconds.
+            /// </summary>
             public double AverageDurationMs => TotalOperations > 0 ? (double)TotalDurationMs / TotalOperations : 0;
 
+            /// <summary>
+            /// Records a new operation with its duration.
+            /// Updates all performance metrics including min, max, and average durations.
+            /// </summary>
+            /// <param name="durationMs">The duration of the operation in milliseconds.</param>
             public void RecordOperation(long durationMs)
             {
                 TotalOperations++;

@@ -9,31 +9,86 @@ using System.Linq;
 namespace COM_Port_Logger.Logging
 {
     /// <summary>
-    /// Log levels for the logging system
+    /// Defines the available log levels for the logging system.
+    /// Levels are ordered from most verbose (Trace) to least verbose (Critical).
     /// </summary>
     public enum LogLevel
     {
+        /// <summary>
+        /// Most verbose level - traces execution flow.
+        /// </summary>
         Trace = 0,
+        
+        /// <summary>
+        /// Debug level - detailed information for debugging.
+        /// </summary>
         Debug = 1,
+        
+        /// <summary>
+        /// Information level - general application flow.
+        /// </summary>
         Info = 2,
+        
+        /// <summary>
+        /// Warning level - potentially harmful situations.
+        /// </summary>
         Warning = 3,
+        
+        /// <summary>
+        /// Error level - error events that might still allow the application to continue.
+        /// </summary>
         Error = 4,
+        
+        /// <summary>
+        /// Critical level - very severe errors that might cause the application to terminate.
+        /// </summary>
         Critical = 5
     }
 
     /// <summary>
-    /// Log entry structure
+    /// Represents a single log entry with all associated metadata.
+    /// Contains timestamp, level, message, context, and additional properties.
     /// </summary>
     public class LogEntry
     {
+        /// <summary>
+        /// Gets or sets the timestamp when the log entry was created.
+        /// </summary>
         public DateTime Timestamp { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the log level of this entry.
+        /// </summary>
         public LogLevel Level { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the main log message.
+        /// </summary>
         public string Message { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the context where the log entry was created.
+        /// </summary>
         public string Context { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the source component that created the log entry.
+        /// </summary>
         public string Source { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the exception associated with this log entry.
+        /// </summary>
         public Exception Exception { get; set; }
+        
+        /// <summary>
+        /// Gets or sets additional properties for structured logging.
+        /// </summary>
         public Dictionary<string, object> Properties { get; set; }
 
+        /// <summary>
+        /// Initializes a new instance of the LogEntry class.
+        /// </summary>
         public LogEntry()
         {
             Properties = new Dictionary<string, object>();
@@ -41,7 +96,8 @@ namespace COM_Port_Logger.Logging
     }
 
     /// <summary>
-    /// Logging configuration
+    /// Configuration settings for the logging system.
+    /// Controls logging behavior, output destinations, and file management.
     /// </summary>
     public class LoggingConfiguration
     {

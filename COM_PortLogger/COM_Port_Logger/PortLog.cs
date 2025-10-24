@@ -26,7 +26,22 @@ namespace COM_Port_Logger
 		static BufferManager _bufferManager;
 		static OptimizedSerialPortReader _serialPortReader;
 		static OptimizedFileWriter _fileWriter;
+		
+		// Ctrl+C handling
+		static bool _shutdownRequested = false;
 
+		/// <summary>
+		/// Handles Ctrl+C (SIGINT) signal to gracefully shutdown the application
+		/// </summary>
+		private static void OnCancelKeyPress(object sender, ConsoleCancelEventArgs e)
+		{
+			e.Cancel = true; // Prevent immediate termination
+			_shutdownRequested = true;
+			_continue = false;
+			
+			Log.Info("Ctrl+C detected - initiating graceful shutdown", "OnCancelKeyPress");
+			Console.WriteLine("\nCtrl+C detected - shutting down gracefully...");
+		}
 
 		public static void Start(string consoleName)
 		{
@@ -44,6 +59,9 @@ namespace COM_Port_Logger
 
 				// Initialize buffer manager for performance optimization
 				_bufferManager = new BufferManager();
+
+				// Set up Ctrl+C handling for graceful shutdown
+				Console.CancelKeyPress += OnCancelKeyPress;
 
 				// Load configuration settings for the specified console name
 				_config = LoadConfig(consoleName);
@@ -115,7 +133,7 @@ namespace COM_Port_Logger
 				ThreadPool.QueueUserWorkItem(CheckConnection);
 				
 				Log.Info("COM Port Logger started successfully", "PortLog");
-				Console.WriteLine("Type QUIT to exit");
+				Console.WriteLine("Type QUIT to exit or press Ctrl+C to shutdown gracefully");
 
 				// Main loop to read user input and send to the serial port
 				while (_continue)
@@ -131,6 +149,7 @@ namespace COM_Port_Logger
 						else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
 						{
 							_continue = false; // Exit the loop if "QUIT" is entered
+							Log.Info("QUIT command received - shutting down", "PortLog");
 						}
 						else
 						{
@@ -193,7 +212,8 @@ namespace COM_Port_Logger
 				// Set the color scheme based on the passed color scheme name
 				_colorScheme = ColorScheme.GetColorScheme(colorSchemeName);
 
-
+				// Set up Ctrl+C handling for graceful shutdown
+				Console.CancelKeyPress += OnCancelKeyPress;
 
 				// Apply display settings for console background, foreground color, and title
 				ApplyDisplaySettings();
@@ -232,7 +252,7 @@ namespace COM_Port_Logger
 				Console.WriteLine($"Color Scheme: {_config.Display.ColorScheme}");
 				Console.WriteLine("--------------------------------------\n");
 
-				Console.WriteLine("Type QUIT to exit");
+				Console.WriteLine("Type QUIT to exit or press Ctrl+C to shutdown gracefully");
 
 				// Main loop to read user input and send to the serial port
 				while (_continue)
@@ -245,6 +265,7 @@ namespace COM_Port_Logger
 					else if (string.Equals("QUIT", message, StringComparison.OrdinalIgnoreCase))
 					{
 						_continue = false; // Exit the loop if "QUIT" is entered
+						Console.WriteLine("QUIT command received - shutting down");
 					}
 					else
 					{
@@ -252,12 +273,8 @@ namespace COM_Port_Logger
 					}
 				}
 
-				_serialPort.Close();
-				_logFileResult.StreamWriter.Close();
-				Console.ResetColor();
-
-				// Set log file as read-only
-				File.SetAttributes(logFilePath, File.GetAttributes(logFilePath) | FileAttributes.ReadOnly);
+				// Cleanup resources gracefully
+				CleanupResources();
 			}
 			catch (Exception ex)
 			{
@@ -654,6 +671,9 @@ namespace COM_Port_Logger
 			try
 			{
 				Log.Info("Starting cleanup of resources", "CleanupResources");
+
+				// Unregister Ctrl+C handler
+				Console.CancelKeyPress -= OnCancelKeyPress;
 
 				// Close serial port
 				if (_serialPort != null && _serialPort.IsOpen)

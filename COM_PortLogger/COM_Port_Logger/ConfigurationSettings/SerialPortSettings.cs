@@ -3,15 +3,39 @@ using System.IO.Ports;
 
 namespace COM_Port_Logger.ConfigurationSettings
 {
+	/// <summary>
+	/// Provides time constants for various time intervals in milliseconds.
+	/// Used for timing operations throughout the application.
+	/// </summary>
 	public static class TimeConstants
 	{
-		public const int Seconds = 1000;     // 1 second in milliseconds
-		public const int Minutes = 60000;    // 1 minute in milliseconds
-		public const int Hours = 3600000;    // 1 hour in milliseconds
+		/// <summary>
+		/// One second in milliseconds (1000ms).
+		/// </summary>
+		public const int Seconds = 1000;
+		
+		/// <summary>
+		/// One minute in milliseconds (60000ms).
+		/// </summary>
+		public const int Minutes = 60000;
+		
+		/// <summary>
+		/// One hour in milliseconds (3600000ms).
+		/// </summary>
+		public const int Hours = 3600000;
 	}
 
+	/// <summary>
+	/// Provides static methods for interactive configuration of serial port settings.
+	/// These methods display available options and allow user input for configuration.
+	/// </summary>
 	public static class SerialPortSettings
 	{
+		/// <summary>
+		/// Interactively sets the COM port name by displaying available ports and allowing user selection.
+		/// </summary>
+		/// <param name="defaultPortName">The default port name to use if no input is provided.</param>
+		/// <returns>The selected port name, or the default if no input is provided.</returns>
 		public static string SetPortName(string defaultPortName)
 		{
 			// Display available ports and allow user to select one
@@ -29,6 +53,11 @@ namespace COM_Port_Logger.ConfigurationSettings
 			return portName;
 		} // End of SetPortName()
 
+		/// <summary>
+		/// Interactively sets the baud rate for serial communication.
+		/// </summary>
+		/// <param name="defaultPortBaudRate">The default baud rate to use if no input is provided.</param>
+		/// <returns>The selected baud rate, or the default if no input is provided.</returns>
 		public static int SetPortBaudRate(int defaultPortBaudRate)
 		{
 			// Allow user to set the baud rate
@@ -41,6 +70,11 @@ namespace COM_Port_Logger.ConfigurationSettings
 			return int.Parse(baudRate);
 		} // End of SetPortBaudRate()
 
+		/// <summary>
+		/// Interactively sets the parity setting for error detection in serial communication.
+		/// </summary>
+		/// <param name="defaultPortParity">The default parity setting to use if no input is provided.</param>
+		/// <returns>The selected parity setting, or the default if no input is provided.</returns>
 		public static Parity SetPortParity(Parity defaultPortParity)
 		{
 			// Allow user to set the parity
@@ -54,6 +88,11 @@ namespace COM_Port_Logger.ConfigurationSettings
 			return (Parity)Enum.Parse(typeof(Parity), parity, true);
 		} // End of SetPortParity()
 
+		/// <summary>
+		/// Interactively sets the number of data bits per character in serial communication.
+		/// </summary>
+		/// <param name="defaultPortDataBits">The default number of data bits to use if no input is provided.</param>
+		/// <returns>The selected number of data bits, or the default if no input is provided.</returns>
 		public static int SetPortDataBits(int defaultPortDataBits)
 		{
 			// Allow user to set the data bits
@@ -66,6 +105,11 @@ namespace COM_Port_Logger.ConfigurationSettings
 			return int.Parse(dataBits);
 		} // End of SetPortDataBits()
 
+		/// <summary>
+		/// Interactively sets the stop bits configuration for serial communication.
+		/// </summary>
+		/// <param name="defaultPortStopBits">The default stop bits setting to use if no input is provided.</param>
+		/// <returns>The selected stop bits setting, or the default if no input is provided.</returns>
 		public static StopBits SetPortStopBits(StopBits defaultPortStopBits)
 		{
 			// Allow user to set the stop bits
@@ -79,6 +123,11 @@ namespace COM_Port_Logger.ConfigurationSettings
 			return (StopBits)Enum.Parse(typeof(StopBits), stopBits, true);
 		} // End of SetPortStopBits()
 
+		/// <summary>
+		/// Interactively sets the handshake protocol for flow control in serial communication.
+		/// </summary>
+		/// <param name="defaultPortHandshake">The default handshake setting to use if no input is provided.</param>
+		/// <returns>The selected handshake setting, or the default if no input is provided.</returns>
 		public static Handshake SetPortHandshake(Handshake defaultPortHandshake)
 		{
 			// Allow user to set the handshake

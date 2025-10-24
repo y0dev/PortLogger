@@ -477,11 +477,19 @@ namespace COM_Port_Logger
 					if (bytesRead > 0)
 					{
 						string message = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
-						Console.WriteLine(message);
-
-						lock (_lock)
+						
+						// Normalize line endings - remove any existing \r\n or \n sequences
+						message = message.Replace("\r\n", "").Replace("\n", "").Replace("\r", "");
+						
+						// Only process non-empty messages
+						if (!string.IsNullOrWhiteSpace(message))
 						{
-							_logMessage = message;
+							Console.WriteLine(message);
+
+							lock (_lock)
+							{
+								_logMessage = message;
+							}
 						}
 					}
 				}

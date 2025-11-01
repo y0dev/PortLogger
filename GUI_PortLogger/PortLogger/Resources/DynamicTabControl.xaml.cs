@@ -138,6 +138,37 @@ namespace PortLogger.Resources
 		{
 			SelectedTab?.SerialLogFile.WriteLine(message);
 		}
+
+		/// <summary>
+		/// Stops all serial ports in all tabs and closes their log files.
+		/// Used during application shutdown to ensure proper cleanup.
+		/// </summary>
+		public void StopAllAndCleanup()
+		{
+			foreach (var tab in Tabs)
+			{
+				try
+				{
+					// Stop serial port reading
+					tab.SerialPortReader?.StopReading();
+					
+					// Close and save log file
+					if (tab.SerialLogFile != null)
+					{
+						tab.SerialLogFile.Close();
+						tab.SerialLogFile.SetAsReadOnly();
+					}
+				}
+				catch (Exception ex)
+				{
+					// Log error but continue cleanup
+					System.Diagnostics.Debug.WriteLine($"Error cleaning up tab {tab.Header}: {ex.Message}");
+				}
+			}
+			
+			// Clear all tabs
+			Tabs.Clear();
+		}
 	}
 
 

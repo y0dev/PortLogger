@@ -123,9 +123,61 @@ namespace ConnectionIndicatorApp
 
 		private void btnExit_Click(object sender, RoutedEventArgs e)
 		{
-
 			Close();
 		} // End of btnExit_Click()
+
+		/// <summary>
+		/// Handles the window closing event to ensure graceful shutdown.
+		/// Stops all active logging, closes connections, and saves log files.
+		/// </summary>
+		/// <param name="sender">The window that is closing.</param>
+		/// <param name="e">Event arguments that can be used to cancel the close.</param>
+		private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+		{
+			try
+			{
+				// Stop any active logging if running
+				if (_isConnected)
+				{
+					if (_selectedLoggingMode == "Ethernet")
+					{
+						StopEthernetLogging();
+					}
+					else if (_selectedLoggingMode == "Serial")
+					{
+						StopSerialLogging(null, null);
+					}
+				}
+
+				// Stop all serial ports in all tabs and cleanup
+				if (dynamicTabControl != null)
+				{
+					dynamicTabControl.StopAllAndCleanup();
+				}
+
+				// Close and save the main log file if it exists
+				if (_logFile != null)
+				{
+					try
+					{
+						_logFile.Close();
+						_logFile.SetAsReadOnly();
+					}
+					catch (Exception ex)
+					{
+						System.Diagnostics.Debug.WriteLine($"Error closing main log file: {ex.Message}");
+					}
+				}
+
+				// Update connection status
+				_isConnected = false;
+			}
+			catch (Exception ex)
+			{
+				// Log error but allow window to close
+				System.Diagnostics.Debug.WriteLine($"Error during window shutdown: {ex.Message}");
+			}
+		} // End of Window_Closing()
 
 		private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{

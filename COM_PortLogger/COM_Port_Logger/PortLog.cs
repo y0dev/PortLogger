@@ -40,6 +40,7 @@ namespace COM_Port_Logger
 			_continue = false;
 			
 			Log.Info("Ctrl+C detected - initiating graceful shutdown", "OnCancelKeyPress");
+			ApplicationOperationLogger.LogApplicationStop(_config?.Display?.ConsoleName ?? "Unknown", "Ctrl+C");
 			Console.WriteLine("\nCtrl+C detected - shutting down gracefully...");
 		}
 
@@ -65,6 +66,10 @@ namespace COM_Port_Logger
 
 				// Load configuration settings for the specified console name
 				_config = LoadConfig(consoleName);
+				
+				// Initialize application operation logger (after config is loaded)
+				ApplicationOperationLogger.Initialize(_config?.LogFile?.BaseDirectory ?? "logs");
+				ApplicationOperationLogger.LogApplicationStart(consoleName);
 
 				if (_config == null)
 				{
@@ -100,9 +105,19 @@ namespace COM_Port_Logger
 				{
 					_serialPort.Open();
 					StructuredLogging.LogSerialPortOperation("Open", _serialPort.PortName, _serialPort.BaudRate, true, "Serial port opened successfully");
+					
+					// Log COM port open to application operation logger
+					ApplicationOperationLogger.LogComPortOpened(
+						_serialPort.PortName, 
+						_serialPort.BaudRate, 
+						_config.SerialPort.Parity, 
+						_config.SerialPort.DataBits, 
+						_config.SerialPort.StopBits, 
+						_config.SerialPort.Handshake);
 				}
 				catch (Exception ex)
 				{
+					ApplicationOperationLogger.LogError("SerialPort", $"Failed to open serial port: {ex.Message}", ex, "PortLog.Start");
 					throw new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
 						$"Failed to open serial port: {ex.Message}", ex);
 				}
@@ -150,6 +165,7 @@ namespace COM_Port_Logger
 						{
 							_continue = false; // Exit the loop if "QUIT" is entered
 							Log.Info("QUIT command received - shutting down", "PortLog");
+							ApplicationOperationLogger.LogApplicationStop(consoleName, "QUIT");
 						}
 						else
 						{
@@ -159,6 +175,7 @@ namespace COM_Port_Logger
 					}
 					catch (Exception ex)
 					{
+						ApplicationOperationLogger.LogError("SerialPort", $"Error sending message to serial port: {ex.Message}", ex, "User input processing");
 						ErrorHandler.HandleSerialPortException(
 							new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
 								$"Error sending message to serial port: {ex.Message}", ex), 
@@ -171,11 +188,13 @@ namespace COM_Port_Logger
 			}
 			catch (COMPortLoggerException ex)
 			{
+				ApplicationOperationLogger.LogError("COMPortLogger", ex.Message, ex, "Start method");
 				ErrorHandler.HandleCOMPortLoggerException(ex, "Start method");
 				throw; // Re-throw to allow caller to handle
 			}
 			catch (Exception ex)
 			{
+				ApplicationOperationLogger.LogError("General", ex.Message, ex, "Start method");
 				ErrorHandler.HandleException(ex, "Start method");
 				throw; // Re-throw to allow caller to handle
 			}
@@ -517,6 +536,7 @@ namespace COM_Port_Logger
 				}
 				catch (IOException ex)
 				{
+					ApplicationOperationLogger.LogError("SerialPort", $"IO error reading from serial port: {ex.Message}", ex, "ReadSerialPort");
 					ErrorHandler.HandleSerialPortException(
 						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
 							$"IO error reading from serial port: {ex.Message}", ex), 
@@ -525,6 +545,7 @@ namespace COM_Port_Logger
 				}
 				catch (InvalidOperationException ex)
 				{
+					ApplicationOperationLogger.LogError("SerialPort", $"Serial port is not open: {ex.Message}", ex, "ReadSerialPort");
 					ErrorHandler.HandleSerialPortException(
 						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
 							$"Serial port is not open: {ex.Message}", ex), 
@@ -533,6 +554,7 @@ namespace COM_Port_Logger
 				}
 				catch (Exception ex)
 				{
+					ApplicationOperationLogger.LogError("SerialPort", $"Unexpected error reading from serial port: {ex.Message}", ex, "ReadSerialPort");
 					ErrorHandler.HandleSerialPortException(
 						new SerialPortException(_serialPort.PortName, _serialPort.BaudRate, 
 							$"Unexpected error reading from serial port: {ex.Message}", ex), 
@@ -569,6 +591,7 @@ namespace COM_Port_Logger
 						}
 						catch (IOException ex)
 						{
+							ApplicationOperationLogger.LogError("FileOperation", $"IO error writing to log file: {ex.Message}", ex, "WriteToLog");
 							ErrorHandler.HandleFileOperationException(
 								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
 									$"IO error writing to log file: {ex.Message}", ex), 
@@ -577,6 +600,7 @@ namespace COM_Port_Logger
 						}
 						catch (ObjectDisposedException ex)
 						{
+							ApplicationOperationLogger.LogError("FileOperation", $"Log file stream has been disposed: {ex.Message}", ex, "WriteToLog");
 							ErrorHandler.HandleFileOperationException(
 								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
 									$"Log file stream has been disposed: {ex.Message}", ex), 
@@ -585,6 +609,7 @@ namespace COM_Port_Logger
 						}
 						catch (Exception ex)
 						{
+							ApplicationOperationLogger.LogError("FileOperation", $"Unexpected error writing to log file: {ex.Message}", ex, "WriteToLog");
 							ErrorHandler.HandleFileOperationException(
 								new FileOperationException(_logFileResult.FilePath, "WriteToLog", 
 									$"Unexpected error writing to log file: {ex.Message}", ex), 
@@ -656,6 +681,7 @@ namespace COM_Port_Logger
 				}
 				catch (Exception ex)
 				{
+					ApplicationOperationLogger.LogError("Connection", $"Error checking connection: {ex.Message}", ex, "CheckConnection");
 					ErrorHandler.HandleConnectionException(
 						new ConnectionException("SerialPort", 0, 
 							$"Error checking connection: {ex.Message}", ex), 
@@ -678,8 +704,12 @@ namespace COM_Port_Logger
 				// Close serial port
 				if (_serialPort != null && _serialPort.IsOpen)
 				{
+					string portName = _serialPort.PortName;
 					_serialPort.Close();
-					StructuredLogging.LogSerialPortOperation("Close", _serialPort.PortName, _serialPort.BaudRate, true, "Serial port closed successfully");
+					StructuredLogging.LogSerialPortOperation("Close", portName, _serialPort.BaudRate, true, "Serial port closed successfully");
+					
+					// Log COM port close to application operation logger
+					ApplicationOperationLogger.LogComPortClosed(portName, "Normal Shutdown");
 				}
 
 				// Close log file
@@ -710,10 +740,14 @@ namespace COM_Port_Logger
 			}
 			catch (Exception ex)
 			{
+				ApplicationOperationLogger.LogError("Cleanup", $"Error during cleanup: {ex.Message}", ex, "CleanupResources");
 				ErrorHandler.HandleException(ex, "CleanupResources", false);
 			}
 			finally
 			{
+				// Shutdown application operation logger
+				ApplicationOperationLogger.Shutdown();
+				
 				// Dispose logging system
 				Log.Dispose();
 			}
